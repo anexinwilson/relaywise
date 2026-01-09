@@ -1,0 +1,15 @@
+name: cognive-backend
+services:
+  cognive-backend:
+    container_name: cognive-backend
+    image: cognive-backend:latest
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app         
+      - ./main.py:/app/main.py  
+    command: ["uv", "run", "main.py"]
+    restart: unless-stopped
