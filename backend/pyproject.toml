@@ -7,8 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.17.2",
     "asyncpg>=0.31.0",
+    "clerk-backend-api>=4.2.0",
+    "cryptography>=45.0.7",
     "fastapi[standard]>=0.128.0",
     "pydantic-settings>=2.12.0",
+    "pyjwt>=2.10.1",
     "python-dotenv>=1.2.1",
     "sqlalchemy[asyncio]>=2.0.45",
     "strawberry-graphql[fastapi]>=0.288.2",

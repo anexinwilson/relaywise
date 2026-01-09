@@ -7,8 +7,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     UPSTASH_REDIS_REST_URL: str
     UPSTASH_REDIS_REST_TOKEN: str
+    CLERK_SECRET_KEY: str
+    CLERK_JWKS_URL: str
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"  # Ignore extra env vars
+    )
 
 
 @lru_cache

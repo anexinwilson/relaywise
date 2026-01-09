@@ -4,8 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.database import get_db
 from app.config.redis import redis_client
+from strawberry.fastapi import GraphQLRouter
+from app.graphql.schema import schema
+from app.graphql.mutations import GraphQLContext
 
 app = FastAPI()
+
+graphql_app = GraphQLRouter(schema, context_getter=GraphQLContext)
+app.include_router(graphql_app, prefix="/graphql")
 
 @app.get("/")
 async def read_root():
