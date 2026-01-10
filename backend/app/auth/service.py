@@ -9,7 +9,6 @@ async def get_or_create_user(
     name: str | None,
     db: AsyncSession
 ) -> User:
-    """Get user by clerk_user_id or create if doesn't exist."""
     result = await db.execute(
         select(User).where(User.clerk_user_id == clerk_user_id)
     )

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        extra="ignore"  # Ignore extra env vars
+        extra="ignore"  
     )
 
 

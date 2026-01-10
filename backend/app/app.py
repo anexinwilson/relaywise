@@ -6,7 +6,7 @@ from app.config.database import get_db
 from app.config.redis import redis_client
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
-from app.graphql.mutations import GraphQLContext
+from app.graphql.context import GraphQLContext
 
 app = FastAPI()
 

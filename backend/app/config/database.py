@@ -21,7 +21,7 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     composio_user_id: Mapped[str | None] = mapped_column()
     composio_mcp_calls: Mapped[int] = mapped_column(default=0)
-    llm_token_count: Mapped[int] = mapped_column(default=0)
+    llm_token: Mapped[int] = mapped_column(default=0)
     tier: Mapped[str] = mapped_column(default="free")
     daily_workflow_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
