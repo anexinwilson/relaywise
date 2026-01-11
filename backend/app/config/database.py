@@ -21,7 +21,7 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     composio_user_id: Mapped[str | None] = mapped_column()
     composio_mcp_calls: Mapped[int] = mapped_column(default=0)
-    llm_token: Mapped[int] = mapped_column(default=0)
+    llm_token_count: Mapped[int] = mapped_column(default=0)
     tier: Mapped[str] = mapped_column(default="free")
     daily_workflow_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -31,20 +31,22 @@ class User(Base):
         return self.name or self.email.split('@')[0]
 
 
-class Project(Base):
-    __tablename__ = "projects"
+class Task(Base):
+    __tablename__ = "tasks"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"proj_{uuid.uuid4().hex[:16]}")
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.clerk_user_id"))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"task_{uuid.uuid4().hex[:16]}")
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.clerk_user_id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column()
+    status: Mapped[str] = mapped_column(default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class IntegrationConnection(Base):
     __tablename__ = "integration_connections"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"conn_{uuid.uuid4().hex[:16]}")
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     app_name: Mapped[str] = mapped_column()
     status: Mapped[str] = mapped_column(default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -54,12 +56,13 @@ class CompiledInstruction(Base):
     __tablename__ = "compiled_instructions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"instr_{uuid.uuid4().hex[:16]}")
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column()
     spec: Mapped[dict] = mapped_column(JSON)
     version: Mapped[int] = mapped_column(default=1)
     monitoring_mode: Mapped[str] = mapped_column(default="instant")
     check_interval: Mapped[int | None] = mapped_column()
+    is_active: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -67,7 +70,7 @@ class WorkflowExecution(Base):
     __tablename__ = "workflow_executions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"exec_{uuid.uuid4().hex[:16]}")
-    instruction_id: Mapped[str] = mapped_column(ForeignKey("compiled_instructions.id"))
+    instruction_id: Mapped[str] = mapped_column(ForeignKey("compiled_instructions.id", ondelete="CASCADE"))
     status: Mapped[str] = mapped_column()
     cost: Mapped[int] = mapped_column(default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -78,9 +81,10 @@ class ChatHistory(Base):
     __tablename__ = "chat_history"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: f"chat_{uuid.uuid4().hex[:16]}")
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     role: Mapped[str] = mapped_column()
     content: Mapped[str] = mapped_column(Text)
+    chat_metadata: Mapped[dict | None] = mapped_column(JSON)
     timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
