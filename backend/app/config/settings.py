@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_REST_TOKEN: str
     CLERK_SECRET_KEY: str
     CLERK_WEBHOOK_SECRET: str
+    COMPOSIO_API_KEY: str
+    GOOGLE_VERTEX_API_KEY: str
+    GEMINI_COMPILER_MODEL: str 
 
     model_config = SettingsConfigDict(
         env_file=".env",
