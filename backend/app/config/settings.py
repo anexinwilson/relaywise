@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_REST_URL: str
     UPSTASH_REDIS_REST_TOKEN: str
     CLERK_SECRET_KEY: str
-    CLERK_JWKS_URL: str
+    CLERK_WEBHOOK_SECRET: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

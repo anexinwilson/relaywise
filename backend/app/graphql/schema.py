@@ -1,11 +1,11 @@
 import strawberry
 from app.graphql.queries import Query
 from app.graphql.mutations.user import UserMutations
-from app.graphql.mutations.project import ProjectMutations
+from app.graphql.mutations.task import TaskMutations
 
 
 @strawberry.type
-class Mutation(UserMutations, ProjectMutations):
+class Mutation(UserMutations, TaskMutations):
     pass
 
 

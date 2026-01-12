@@ -8,7 +8,7 @@ class User:
     name: str 
 
 @strawberry.type
-class Project:
+class Task:
     id: str
     name: str
     created_at: datetime
