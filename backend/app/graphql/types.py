@@ -21,6 +21,19 @@ class AppInfo:
     key: str
 
 @strawberry.type
+class FunctionCall:
+    name: str
+    args: strawberry.scalars.JSON | None
+    result: str | None
+
+@strawberry.type
+class TaskExecutionResult:
+    success: bool
+    response: str | None  # Make this nullable
+    function_calls: list[FunctionCall]
+    error: str | None
+
+@strawberry.type
 class AppsListResponse:
     success: bool
     apps: list[JSON]

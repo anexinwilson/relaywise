@@ -1,7 +1,7 @@
 import strawberry
 from app.auth.middleware import verify_clerk_token
 from app.integrations.service import get_integration_service
-from app.graphql.types import ComposioGeminiResponse, FunctionCall
+from app.graphql.types import TaskExecutionResult, FunctionCall
 from app.graphql.context import GraphQLContext
 
 
@@ -12,7 +12,7 @@ class IntegrationMutations:
         self,
         message: str,
         info: strawberry.Info[GraphQLContext, None]
-    ) -> ComposioGeminiResponse:
+    ) -> TaskExecutionResult:
         try:
             user_info = verify_clerk_token(info.context.request)
             clerk_user_id = user_info["clerk_user_id"]
@@ -26,18 +26,22 @@ class IntegrationMutations:
             )
             
             function_calls = [
-                FunctionCall(name=fc["name"], args=fc.get("args"))
+                FunctionCall(
+                    name=fc["name"],
+                    args=fc.get("args"),
+                    result=fc.get("result")
+                )
                 for fc in result["function_calls"]
             ]
             
-            return ComposioGeminiResponse(
+            return TaskExecutionResult(
                 success=True,
                 response=result["response"],
                 function_calls=function_calls,
                 error=None
             )
         except Exception as e:
-            return ComposioGeminiResponse(
+            return TaskExecutionResult(
                 success=False,
                 response="",
                 function_calls=[],
