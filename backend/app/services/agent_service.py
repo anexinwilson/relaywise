@@ -1,125 +1,256 @@
-from typing import Dict, List, Any, Optional
+import json
+import httpx
+import boto3
+import time
+from typing import Dict, List, Any, Optional, TypedDict
+
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
-from composio import Composio
-from app.config.settings import settings
+from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.graph import StateGraph, END
+from pinecone import Pinecone
 from google.oauth2 import service_account
+from google.auth.transport.requests import Request
 
-_composio_client: Optional[Composio] = None
-BLACKLIST_TOOLKITS = {"MICROSOFTGRAPH", "MICROSOFTONEDRIVE", "MICROSOFTOUTLOOK", "MICROSOFTTEAMS"}
-_conversation_sessions: Dict[str, Any] = {}
+from app.config.settings import settings
 
+_bedrock_client = None
+_pinecone_index = None
+_google_credentials = None
 
-def get_composio_client() -> Composio:
-    global _composio_client
-    if _composio_client is None:
-        _composio_client = Composio(api_key=settings.COMPOSIO_API_KEY)
-    return _composio_client
+def get_bedrock_client():
+    global _bedrock_client
+    if _bedrock_client is None:
+        _bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
+    return _bedrock_client
 
+def get_pinecone_index():
+    global _pinecone_index
+    if _pinecone_index is None:
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        _pinecone_index = pc.Index(settings.PINECONE_INDEX_NAME)
+    return _pinecone_index
 
-async def get_or_create_session(
-    user_id: str,
-    conversation_id: str,
-    connected_apps: Optional[List[str]] = None
-) -> Any:
-    session_key = f"{user_id}:{conversation_id}"
-    if session_key in _conversation_sessions:
-        return _conversation_sessions[session_key]
-    
-    composio = get_composio_client()
-    kwargs = {"user_id": user_id, "manage_connections": True}
-    
-    if connected_apps:
-        kwargs["toolkits"] = [
-            app.upper() for app in connected_apps 
-            if app.upper() not in BLACKLIST_TOOLKITS
-        ]
-    
-    session = composio.create(**kwargs)
-    _conversation_sessions[session_key] = session
-    return session
-
-
-class AgentService:
-    def __init__(self):
-        credentials = service_account.Credentials.from_service_account_file(
+def get_google_credentials():
+    global _google_credentials
+    if _google_credentials is None:
+        _google_credentials = service_account.Credentials.from_service_account_file(
             settings.GOOGLE_APPLICATION_CREDENTIALS,
             scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
+        _google_credentials.refresh(Request())
+    return _google_credentials
+
+class AgentState(TypedDict):
+    messages: List[Any]
+    rag_results: Optional[List[Dict]]
+    current_action: Optional[Dict]
+    user_id: str
+    conversation_id: str
+
+class RAGClient:
+    def __init__(self):
+        self.index = get_pinecone_index()
+        self.bedrock = get_bedrock_client()
+    
+    def search_tools(self, query: str, top_k: int = 3) -> List[Dict]:
+        try:
+            embedding = self._get_embedding(query)
+            if not embedding:
+                return []
+            
+            results = self.index.query(vector=embedding, top_k=top_k, include_metadata=True)
+            
+            tools = []
+            for match in results.matches:
+                meta = match.metadata
+                if isinstance(meta, str):
+                    try:
+                        meta = json.loads(meta)
+                    except:
+                        continue
+                
+                req_params = meta.get("required_params", "")
+                opt_params = meta.get("optional_params", "")
+                
+                tools.append({
+                    "tool_slug": meta.get("slug"),
+                    "tool_id": meta.get("tool_id"),
+                    "toolkit": meta.get("toolkit"),
+                    "description": meta.get("text", ""),
+                    "required_params": req_params.split(",") if req_params else [],
+                    "optional_params": opt_params.split(",") if opt_params else [],
+                    "score": match.score
+                })
+            
+            return tools
+        except:
+            return []
+    
+    def _get_embedding(self, text: str) -> List[float]:
+        try:
+            response = self.bedrock.invoke_model(
+                modelId='amazon.titan-embed-text-v2:0',
+                body=json.dumps({"inputText": text, "dimensions": 1024, "normalize": True})
+            )
+            return json.loads(response['body'].read()).get('embedding', [])
+        except:
+            return []
+
+class ComposioExecutor:
+    def __init__(self):
+        self.api_key = settings.COMPOSIO_API_KEY
+        self.base_url = "https://backend.composio.dev/api/v3"
+    
+    async def execute(self, tool_slug: str, user_id: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/tools/execute/{tool_slug}",
+                headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
+                json={"user_id": user_id, "arguments": arguments},
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+
+class AgentNodes:
+    def __init__(self, llm, rag: RAGClient, executor: ComposioExecutor):
+        self.llm = llm
+        self.rag = rag
+        self.executor = executor
+        self.system_prompt = """You are an AI automation controller.
+Select the best tool from the RAG context to fulfill the user request.
+
+Return ONLY a JSON object:
+{
+  "action_type": "chat" | "action",
+  "confidence": 0.0-1.0,
+  "response": "Brief explanation",
+  "tool_slug": "EXACT_SLUG_FROM_METADATA",
+  "tool_id": "EXACT_TOOL_ID_FROM_METADATA",
+  "arguments": {"param": "value"}
+}
+
+CRITICAL: tool_id and tool_slug must be copied exactly from the RAG results. Never generate or modify them."""
+
+    async def rag_and_decide(self, state: AgentState) -> AgentState:
+        user_message = state["messages"][-1].content
+        rag_results = self.rag.search_tools(user_message)
+        state["rag_results"] = rag_results
         
+        if not rag_results:
+            state["current_action"] = {"action_type": "chat", "response": "No tools found for this request."}
+            return state
+        
+        tools_json = json.dumps(rag_results)
+        prompt = f"{self.system_prompt}\n\nQuery: {user_message}\n\nTools:\n{tools_json}"
+        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+        
+        try:
+            content = response.content
+            if isinstance(content, list):
+                content = ''.join([p.get('text', '') if isinstance(p, dict) else str(p) for p in content])
+            
+            content = content.split("```json")[1].split("```")[0].strip() if "```json" in content else content.split("```")[1].strip() if "```" in content else content
+            state["current_action"] = json.loads(content)
+        except:
+            state["current_action"] = {"action_type": "chat", "response": str(response.content) if not isinstance(response.content, list) else "Error parsing response"}
+        
+        return state
+
+    def route(self, state: AgentState) -> str:
+        action = state.get("current_action", {})
+        if action.get("action_type") == "action" and action.get("confidence", 0) >= 0.85:
+            return "execute"
+        return "chat"
+
+    async def chat(self, state: AgentState) -> AgentState:
+        response = state["current_action"].get("response", "I'm not sure how to help.")
+        state["messages"].append(AIMessage(content=str(response) if isinstance(response, list) else response))
+        return state
+
+    async def execute(self, state: AgentState) -> AgentState:
+        action = state["current_action"]
+        try:
+            rag_tools = {tool["tool_id"]: tool for tool in state.get("rag_results", [])}
+            selected_tool = rag_tools.get(action.get("tool_id"))
+            
+            if not selected_tool:
+                raise ValueError(f"Hallucinated tool_id: {action.get('tool_id')}")
+            
+            if selected_tool["tool_slug"] != action.get("tool_slug"):
+                raise ValueError(f"tool_slug mismatch")
+            
+            result = await self.executor.execute(
+                tool_slug=action["tool_slug"],
+                user_id=state["user_id"],
+                arguments=action["arguments"]
+            )
+            response = f"{action.get('response', 'Done')}\n\n{json.dumps(result, indent=2)}"
+            state["messages"].append(AIMessage(content=response))
+        except Exception as e:
+            state["messages"].append(AIMessage(content=f"Error: {str(e)}"))
+        return state
+
+class AgentService:
+    def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-3-flash-preview",
-            credentials=credentials,
+            model=settings.GEMINI_COMPILER_MODEL,
+            credentials=get_google_credentials(),
             project="careful-airfoil-483607-g1",
             temperature=0,
             thinking_level="minimal"
         )
-    
-    async def execute_task(
-        self,
-        user_id: str,
-        message: str,
-        conversation_id: str,
-        connected_apps: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        mcp_client = None
+        self.rag = RAGClient()
+        self.executor = ComposioExecutor()
+        self.nodes = AgentNodes(self.llm, self.rag, self.executor)
+        self.graph = self._build_graph()
+
+    def _build_graph(self) -> StateGraph:
+        workflow = StateGraph(AgentState)
+        
+        workflow.add_node("rag_and_decide", self.nodes.rag_and_decide)
+        workflow.add_node("chat", self.nodes.chat)
+        workflow.add_node("execute", self.nodes.execute)
+        
+        workflow.set_entry_point("rag_and_decide")
+        workflow.add_conditional_edges("rag_and_decide", self.nodes.route, {
+            "chat": "chat",
+            "execute": "execute"
+        })
+        workflow.add_edge("chat", END)
+        workflow.add_edge("execute", END)
+        
+        return workflow.compile()
+
+    async def execute_task(self, user_id: str, message: str, conversation_id: str) -> Dict[str, Any]:
+        start = time.time()
         try:
-            session = await get_or_create_session(user_id, conversation_id, connected_apps)
+            state: AgentState = {
+                "messages": [HumanMessage(content=message)],
+                "rag_results": [],
+                "current_action": None,
+                "user_id": user_id,
+                "conversation_id": conversation_id
+            }
             
-            mcp_client = MultiServerMCPClient({
-                "composio": {
-                    "url": session.mcp.url,
-                    "transport": "streamable_http",
-                    "headers": session.mcp.headers
-                }
-            })
+            result = await self.graph.ainvoke(state)
+            final = result["messages"][-1].content
             
-            tools = await mcp_client.get_tools()
-            if not tools:
-                return {"response": "Tool Router setup failed. Please try again.", "function_calls": []}
+            if isinstance(final, list):
+                final = ''.join([p.get('text', '') if isinstance(p, dict) else str(p) for p in final])
             
-            agent = create_react_agent(self.llm, tools, checkpointer=None)
-            result = await agent.ainvoke({"messages": [{"role": "user", "content": message}]})
-            
-            function_calls = []
-            response_text = None
-            
-            for msg in result.get("messages", []):
-                if hasattr(msg, "tool_calls") and msg.tool_calls:
-                    function_calls.extend({
-                        "name": tc.get("name", "unknown"),
-                        "args": tc.get("args", {}),
-                        "result": None
-                    } for tc in msg.tool_calls)
-                
-                if hasattr(msg, "content") and msg.content:
-                    content = msg.content
-                    if isinstance(content, list):
-                        response_text = ' '.join(
-                            item.get('text', '') 
-                            for item in content 
-                            if isinstance(item, dict) and 'text' in item
-                        ).strip() or response_text
-                    elif isinstance(content, str):
-                        response_text = content.strip()
+            print(f"{time.time() - start:.2f}s")
             
             return {
-                "response": response_text or "Task completed successfully.",
-                "function_calls": function_calls
+                "response": final,
+                "awaiting_user": False,
+                "rag_tools_found": len(result.get("rag_results", [])),
+                "function_calls": []
             }
         except Exception as e:
-            return {"response": f"I encountered an error: {str(e)}. Please try again.", "function_calls": []}
-        finally:
-            if mcp_client:
-                try:
-                    await mcp_client.close()
-                except:
-                    pass
+            return {"response": f"System Error: {str(e)}", "function_calls": [], "awaiting_user": False}
 
-
-_agent_service: Optional[AgentService] = None
-
+_agent_service = None
 
 def get_agent_service() -> AgentService:
     global _agent_service

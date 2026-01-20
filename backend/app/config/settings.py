@@ -13,11 +13,15 @@ class Settings(BaseSettings):
     GOOGLE_VERTEX_API_KEY: str
     GOOGLE_APPLICATION_CREDENTIALS: str
     GEMINI_COMPILER_MODEL: str 
-    COMPOSIO_MCP_CONFIG_ID: str = "e2a524f6-d00c-49bc-93e1-9a35716b97e4"
+    COMPOSIO_MCP_CONFIG_ID: str
+    PINECONE_API_KEY: str
+    PINECONE_INDEX_NAME: str
+    PINECONE_CONNECTION_STRING: str
     logging.basicConfig(
-    level=logging.INFO,  # Changed from WARNING to INFO
+    level=logging.INFO,  
     format='[%(asctime)s][%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
+    
 )
 
     model_config = SettingsConfigDict(

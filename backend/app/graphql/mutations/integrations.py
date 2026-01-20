@@ -106,4 +106,5 @@ class IntegrationMutations:
                 conversation_id=conversation_id or "",
                 function_calls=[],
                 error=str(e)
+                
             )
