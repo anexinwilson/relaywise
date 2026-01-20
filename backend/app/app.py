@@ -11,18 +11,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.webhooks.clerk import handle_clerk_webhook
 from google import genai
 from app.config.settings import settings
+from composio import Composio
+from contextlib import asynccontextmanager
+from typing import Optional
 
 
-app = FastAPI()
+composio_client: Optional[Composio] = None
 
-
-@app.on_event("startup")
-async def startup_event():
-    client = genai.Client(
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global composio_client
+    genai_client = genai.Client(
         vertexai=True,
         api_key=settings.GOOGLE_VERTEX_API_KEY
     )
-    app.state.genai_client = client
+    app.state.genai_client = genai_client
+    composio_client = Composio(api_key=settings.COMPOSIO_API_KEY)
+    app.state.composio_client = composio_client
+    yield
+    composio_client = None
+
+app = FastAPI(lifespan=lifespan)
+
+def get_composio() -> Composio:
+    if composio_client is None:
+        raise HTTPException(status_code=500, detail="Composio client not initialized")
+    return composio_client
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,5 +53,3 @@ app.include_router(graphql_app, prefix="/graphql")
 @app.post("/webhooks/clerk")
 async def clerk_webhook(request: Request):
     return await handle_clerk_webhook(request)
-
-

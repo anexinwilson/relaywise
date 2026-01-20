@@ -29,7 +29,8 @@ class FunctionCall:
 @strawberry.type
 class TaskExecutionResult:
     success: bool
-    response: str | None  # Make this nullable
+    response: str | None
+    conversation_id: str
     function_calls: list[FunctionCall]
     error: str | None
 

@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+import logging
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -11,7 +11,14 @@ class Settings(BaseSettings):
     CLERK_WEBHOOK_SECRET: str
     COMPOSIO_API_KEY: str
     GOOGLE_VERTEX_API_KEY: str
+    GOOGLE_APPLICATION_CREDENTIALS: str
     GEMINI_COMPILER_MODEL: str 
+    COMPOSIO_MCP_CONFIG_ID: str = "e2a524f6-d00c-49bc-93e1-9a35716b97e4"
+    logging.basicConfig(
+    level=logging.INFO,  # Changed from WARNING to INFO
+    format='[%(asctime)s][%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
     model_config = SettingsConfigDict(
         env_file=".env",
