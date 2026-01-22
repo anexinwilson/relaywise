@@ -1,4 +1,3 @@
-# AppSync GraphQL API
 resource "aws_appsync_graphql_api" "main" {
   name                = "cognive-appsync"
   authentication_type = "API_KEY"
@@ -6,39 +5,15 @@ resource "aws_appsync_graphql_api" "main" {
   schema = <<EOF
 type Query {
   hello: String
-  tasks: [Task]
-  composioApps: AppsListResponse
 }
 
 type Mutation {
-  executeComposioTask(message: String!): TaskExecutionResult
-  executeMcpTask(message: String!, conversationId: String): TaskExecutionResult
+  testMutation(message: String!): TestResponse
 }
 
-type Task {
-  id: ID!
-  name: String!
-  createdAt: AWSDateTime!
-}
-
-type TaskExecutionResult {
-  success: Boolean!
-  response: String
-  conversationId: ID!
-  functionCalls: [FunctionCall!]!
-  error: String
-}
-
-type FunctionCall {
-  name: String!
-  args: AWSJSON
+type TestResponse {
   result: String
-}
-
-type AppsListResponse {
-  success: Boolean!
-  apps: [AWSJSON!]!
-  error: String
+  success: Boolean
 }
 EOF
 
@@ -48,36 +23,53 @@ EOF
   }
 }
 
-# API Key for AppSync authentication
 resource "aws_appsync_api_key" "main" {
   api_id      = aws_appsync_graphql_api.main.id
-  description = "API key for Cognive AppSync GraphQL API"
-  expires     = timeadd(timestamp(), "${var.api_key_expiration_days * 24}h")
+  description = "API key for Cognive AppSync"
+  expires     = timeadd(timestamp(), "8760h")
 }
 
-# NONE data source for UNIT resolvers (direct response, no backend)
-resource "aws_appsync_datasource" "none" {
-  api_id = aws_appsync_graphql_api.main.id
-  name   = "NONE"
-  type   = "NONE"
+resource "aws_appsync_datasource" "lambda" {
+  api_id           = aws_appsync_graphql_api.main.id
+  name             = "LambdaDataSource"
+  type             = "AWS_LAMBDA"
+  service_role_arn = aws_iam_role.appsync_lambda_role.arn
+  lambda_config {
+    function_arn = local.lambda_function_arn
+  }
 }
 
-# Mock resolver for hello query - UNIT resolver
-resource "aws_appsync_resolver" "hello" {
+resource "aws_appsync_resolver" "test_mutation" {
   api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "hello"
-  data_source = aws_appsync_datasource.none.name
-  kind        = "UNIT"
-
-  request_template = <<EOF
-{
-  "version": "2017-02-28",
-  "payload": "Hello from AppSync!"
+  type        = "Mutation"
+  field       = "testMutation"
+  data_source = aws_appsync_datasource.lambda.name
+  
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  
+  code = <<EOF
+export function request(ctx) {
+  return {
+    operation: 'Invoke',
+    payload: {
+      field: 'testMutation',
+      arguments: ctx.arguments,
+      request: {
+        headers: ctx.request.headers
+      },
+      info: {
+        fieldName: ctx.info.fieldName,
+        parentTypeName: ctx.info.parentTypeName
+      }
+    }
+  };
 }
-EOF
 
-  response_template = <<EOF
-$util.toJson($context.result)
+export function response(ctx) {
+  return ctx.result;
+}
 EOF
 }
