@@ -5,7 +5,3 @@ output "lambda_function_arn" {
 output "ecr_repository_url" {
   value = aws_ecr_repository.lambda_repo.repository_url
 }
-
-output "secrets_manager_arn" {
-  value = data.aws_secretsmanager_secret.app_secrets.arn
-}

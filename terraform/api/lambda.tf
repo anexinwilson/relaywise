@@ -3,48 +3,83 @@ resource "aws_ecr_repository" "lambda_repo" {
   image_tag_mutability = "MUTABLE"
 }
 
+resource "aws_cloudwatch_log_group" "authorizer_logs" {
+  name              = "/aws/lambda/cognive-authorizer"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "token_manager_logs" {
+  name              = "/aws/lambda/cognive-token-manager"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "cognive_lambda_logs" {
+  name              = "/aws/lambda/cognive-lambda"
+  retention_in_days = 7
+}
+
+resource "aws_lambda_function" "authorizer" {
+  function_name = "cognive-authorizer"
+  role          = aws_iam_role.parameter_store_role.arn
+  timeout       = 30
+
+  image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-authorizer"
+  package_type = "Image"
+
+  logging_config {
+    log_group  = aws_cloudwatch_log_group.authorizer_logs.name
+    log_format = "JSON"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.authorizer_logs]
+}
+
 resource "aws_lambda_function" "cognive_lambda" {
   function_name = "cognive-lambda"
   role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.lambda_repo.repository_url}:latest"
-  
-  timeout     = 30
-  memory_size = 512
+  timeout       = 30
 
-  environment {
-    variables = {
-      SECRETS_MANAGER_SECRET_NAME = data.aws_secretsmanager_secret.app_secrets.name
-    }
+  image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-lambda"
+  package_type = "Image"
+
+  logging_config {
+    log_group  = aws_cloudwatch_log_group.cognive_lambda_logs.name
+    log_format = "JSON"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.cognive_lambda_logs]
+}
+
+resource "aws_lambda_function" "token_manager" {
+  function_name = "cognive-token-manager"
+  role          = aws_iam_role.parameter_store_role.arn
+  timeout       = 30
+
+  image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-token-manager"
+  package_type = "Image"
+
+  logging_config {
+    log_group  = aws_cloudwatch_log_group.token_manager_logs.name
+    log_format = "JSON"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.token_manager_logs]
+}
+
+resource "aws_lambda_function_url" "token_manager_url" {
+  function_name          = aws_lambda_function.token_manager.function_name
+  authorization_type     = "NONE"
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["POST"]
+    allow_headers = ["Content-Type"]
   }
 }
 
-resource "aws_iam_role" "lambda_role" {
-  name = "cognive-lambda-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy" "lambda_secrets" {
-  name = "lambda-secrets-policy"
-  role = aws_iam_role.lambda_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["secretsmanager:GetSecretValue"]
-      Resource = [data.aws_secretsmanager_secret.app_secrets.arn]
-    }]
-  })
+resource "aws_lambda_permission" "token_manager_url_permission" {
+  statement_id           = "AllowPublicInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.token_manager.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
 }

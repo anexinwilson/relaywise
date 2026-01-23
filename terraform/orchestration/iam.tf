@@ -47,7 +47,20 @@ resource "aws_iam_role_policy" "appsync_lambda_policy" {
     Statement = [{
       Effect = "Allow"
       Action = ["lambda:InvokeFunction"]
-      Resource = [local.lambda_function_arn]
+      Resource = ["arn:aws:lambda:${var.aws_region}:*:function:cognive-lambda"]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "appsync_authorizer_invoke" {
+  name = "appsync-authorizer-invoke-policy"
+  role = aws_iam_role.appsync_lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["lambda:InvokeFunction"]
+      Resource = ["arn:aws:lambda:${var.aws_region}:*:function:cognive-authorizer"]
     }]
   })
 }

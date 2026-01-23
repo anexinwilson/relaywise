@@ -3,8 +3,10 @@ $Region = "us-east-1"
 $RepoName = "cognive-lambda-repo"
 $RepoUrl = "$AccountId.dkr.ecr.$Region.amazonaws.com/$RepoName"
 
-Write-Host "Building Docker image..." -ForegroundColor Cyan
-docker build --provenance=false --platform linux/amd64 -t "$RepoUrl`:latest" .
+Write-Host "Building Docker images..." -ForegroundColor Cyan
+docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-lambda" -f Dockerfile.handler .
+docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-authorizer" -f Dockerfile.authorizer .
+docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-token-manager" -f Dockerfile.token-manager .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Docker build failed"
@@ -19,12 +21,14 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Pushing to ECR..." -ForegroundColor Cyan
-docker push "$RepoUrl`:latest"
+Write-Host "Pushing images to ECR..." -ForegroundColor Cyan
+docker push "$RepoUrl`:cognive-lambda"
+docker push "$RepoUrl`:cognive-authorizer"
+docker push "$RepoUrl`:cognive-token-manager"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Docker push failed"
     exit 1
 }
 
-Write-Host "Done! Image pushed to: $RepoUrl`:latest" -ForegroundColor Green
+Write-Host "Done! Images pushed to ECR" -ForegroundColor Green

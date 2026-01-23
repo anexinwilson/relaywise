@@ -1,6 +1,11 @@
 resource "aws_appsync_graphql_api" "main" {
   name                = "cognive-appsync"
-  authentication_type = "API_KEY"
+  authentication_type = "AWS_LAMBDA"
+  
+  lambda_authorizer_config {
+    authorizer_uri                   = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cognive-authorizer"
+    authorizer_result_ttl_in_seconds = 300
+  }
   
   schema = <<EOF
 type Query {
@@ -14,6 +19,13 @@ type Mutation {
 type TestResponse {
   result: String
   success: Boolean
+  user: User
+}
+
+type User {
+  userId: String
+  email: String
+  name: String
 }
 EOF
 
@@ -23,11 +35,7 @@ EOF
   }
 }
 
-resource "aws_appsync_api_key" "main" {
-  api_id      = aws_appsync_graphql_api.main.id
-  description = "API key for Cognive AppSync"
-  expires     = timeadd(timestamp(), "8760h")
-}
+data "aws_caller_identity" "current" {}
 
 resource "aws_appsync_datasource" "lambda" {
   api_id           = aws_appsync_graphql_api.main.id
@@ -35,8 +43,22 @@ resource "aws_appsync_datasource" "lambda" {
   type             = "AWS_LAMBDA"
   service_role_arn = aws_iam_role.appsync_lambda_role.arn
   lambda_config {
-    function_arn = local.lambda_function_arn
+    function_arn = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cognive-lambda"
   }
+}
+
+resource "aws_lambda_permission" "appsync_invoke" {
+  statement_id  = "AllowAppSyncInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = "cognive-lambda"
+  principal     = "appsync.amazonaws.com"
+}
+
+resource "aws_lambda_permission" "appsync_authorizer_invoke" {
+  statement_id  = "AllowAppSyncAuthorizerInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = "cognive-authorizer"
+  principal     = "appsync.amazonaws.com"
 }
 
 resource "aws_appsync_resolver" "test_mutation" {
@@ -58,7 +80,7 @@ export function request(ctx) {
       field: 'testMutation',
       arguments: ctx.arguments,
       request: {
-        headers: ctx.request.headers
+        headers: ctx.identity.resolverContext
       },
       info: {
         fieldName: ctx.info.fieldName,
@@ -69,6 +91,9 @@ export function request(ctx) {
 }
 
 export function response(ctx) {
+  if (ctx.error) {
+    return ctx.error;
+  }
   return ctx.result;
 }
 EOF
