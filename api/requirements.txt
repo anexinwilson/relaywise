@@ -1,5 +1,4 @@
 boto3
-clerk-backend-api
 fastapi[standard]
 uvicorn
 mangum
@@ -7,3 +6,9 @@ PyJWT
 cryptography
 requests
 python-dotenv
+sqlalchemy[asyncio]
+asyncpg
+upstash-redis
+clerk-backend-api
+pydantic-settings
+alembic

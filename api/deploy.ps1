@@ -4,7 +4,7 @@ $RepoName = "cognive-lambda-repo"
 $RepoUrl = "$AccountId.dkr.ecr.$Region.amazonaws.com/$RepoName"
 
 Write-Host "Building Docker images..." -ForegroundColor Cyan
-docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-lambda" -f Dockerfile.handler .
+docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-lambda" -f Dockerfile .
 docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-authorizer" -f Dockerfile.authorizer .
 docker build --no-cache --provenance=false --platform linux/amd64 -t "$RepoUrl`:cognive-token-manager" -f Dockerfile.token-manager .
 

@@ -13,19 +13,15 @@ type Query {
 }
 
 type Mutation {
-  testMutation(message: String!): TestResponse
+  getOrCreateUser: UserResponse
 }
 
-type TestResponse {
-  result: String
-  success: Boolean
-  user: User
-}
-
-type User {
+type UserResponse {
   userId: String
   email: String
   name: String
+  tier: String
+  apiCallCount: Int
 }
 EOF
 
@@ -61,10 +57,10 @@ resource "aws_lambda_permission" "appsync_authorizer_invoke" {
   principal     = "appsync.amazonaws.com"
 }
 
-resource "aws_appsync_resolver" "test_mutation" {
+resource "aws_appsync_resolver" "get_or_create_user" {
   api_id      = aws_appsync_graphql_api.main.id
   type        = "Mutation"
-  field       = "testMutation"
+  field       = "getOrCreateUser"
   data_source = aws_appsync_datasource.lambda.name
   
   runtime {
@@ -77,14 +73,12 @@ export function request(ctx) {
   return {
     operation: 'Invoke',
     payload: {
-      field: 'testMutation',
+      info: {
+        fieldName: ctx.info.fieldName
+      },
       arguments: ctx.arguments,
       request: {
         headers: ctx.identity.resolverContext
-      },
-      info: {
-        fieldName: ctx.info.fieldName,
-        parentTypeName: ctx.info.parentTypeName
       }
     }
   };

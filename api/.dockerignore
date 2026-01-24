@@ -1,0 +1,10 @@
+.venv
+.git
+.gitignore
+__pycache__
+*.pyc
+.env
+.pytest_cache
+alembic/versions/__pycache__
+*.egg-info
+.DS_Store

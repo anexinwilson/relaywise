@@ -20,7 +20,7 @@ resource "aws_cloudwatch_log_group" "cognive_lambda_logs" {
 
 resource "aws_lambda_function" "authorizer" {
   function_name = "cognive-authorizer"
-  role          = aws_iam_role.parameter_store_role.arn
+  role          = aws_iam_role.authorizer_role.arn
   timeout       = 30
 
   image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-authorizer"
@@ -52,7 +52,7 @@ resource "aws_lambda_function" "cognive_lambda" {
 
 resource "aws_lambda_function" "token_manager" {
   function_name = "cognive-token-manager"
-  role          = aws_iam_role.parameter_store_role.arn
+  role          = aws_iam_role.lambda_role.arn
   timeout       = 30
 
   image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-token-manager"

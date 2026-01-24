@@ -15,8 +15,21 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role" "parameter_store_role" {
-  name = "cognive-parameter-store-role"
+resource "aws_iam_role_policy" "lambda_secrets_policy" {
+  name = "lambda-secrets-policy"
+  role = aws_iam_role.lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:cognive/lambda/secrets-*"
+    }]
+  })
+}
+
+resource "aws_iam_role" "authorizer_role" {
+  name = "cognive-authorizer-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -27,38 +40,20 @@ resource "aws_iam_role" "parameter_store_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "parameter_store_basic" {
-  role       = aws_iam_role.parameter_store_role.name
+resource "aws_iam_role_policy_attachment" "authorizer_basic" {
+  role       = aws_iam_role.authorizer_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy" "parameter_store_policy" {
-  name = "parameter-store-policy"
-  role = aws_iam_role.parameter_store_role.id
+resource "aws_iam_role_policy" "authorizer_secrets_policy" {
+  name = "authorizer-secrets-policy"
+  role = aws_iam_role.authorizer_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      Action = [
-        "ssm:GetParameter",
-        "ssm:PutParameter"
-      ]
-      Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/cognive/*"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "lambda_invoke_policy" {
-  name = "lambda-invoke-policy"
-  role = aws_iam_role.parameter_store_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "lambda:InvokeFunction"
-      ]
-      Resource = "*"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:cognive/lambda/secrets-*"
     }]
   })
 }
