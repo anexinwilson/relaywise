@@ -10,6 +10,14 @@ resource "aws_appsync_graphql_api" "main" {
   schema = <<EOF
 type Query {
   hello: String
+  askAgent(message: String!): AgentResponse
+}
+
+type AgentResponse {
+  success: Boolean
+  response: String
+  rag_tools_found: Int
+  error: String
 }
 
 type Mutation {
@@ -55,6 +63,59 @@ resource "aws_lambda_permission" "appsync_authorizer_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = "cognive-authorizer"
   principal     = "appsync.amazonaws.com"
+}
+
+resource "aws_appsync_datasource" "agentcore_http" {
+  api_id           = aws_appsync_graphql_api.main.id
+  name             = "AgentCoreHTTPDataSource"
+  type             = "HTTP"
+  service_role_arn = aws_iam_role.appsync_lambda_role.arn
+  
+  http_config {
+    endpoint = var.agentcore_endpoint
+  }
+}
+
+resource "aws_appsync_resolver" "ask_agent" {
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Query"
+  field       = "askAgent"
+  data_source = aws_appsync_datasource.agentcore_http.name
+  
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  
+  code = <<-EOF
+export function request(ctx) {
+  const payload = {
+    userId: ctx.identity.resolverContext.userId,
+    sessionId: ctx.requestId,
+    message: ctx.args.message
+  };
+
+  return {
+    method: 'POST',
+    resourcePath: '/invocations',
+    params: {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }
+  };
+}
+
+export function response(ctx) {
+  const { statusCode, body } = ctx.result;
+  
+  if (statusCode === 200) {
+    return JSON.parse(body);
+  }
+  
+  util.appendError(body, statusCode);
+  return null;
+}
+EOF
 }
 
 resource "aws_appsync_resolver" "get_or_create_user" {

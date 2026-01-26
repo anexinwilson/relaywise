@@ -1,6 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { DashboardContent } from "./DashboardContent";
+import { DashboardChat } from "./DashboardChat";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
@@ -18,5 +18,5 @@ export default async function DashboardPage() {
     }))
   } : null;
 
-  return <DashboardContent user={userData} />;
+  return <DashboardChat user={userData} />;
 }

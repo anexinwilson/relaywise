@@ -8,3 +8,14 @@ variable "lambda_function_name" {
   description = "Name of the Lambda function to grant AppSync permission to invoke"
   default     = "cognive-lambda"
 }
+
+variable "agentcore_endpoint" {
+  type        = string
+  description = "AgentCore endpoint (ngrok URL or deployed URL)"
+}
+
+variable "enable_appsync_events" {
+  description = "Enable AppSync Events API for real-time agent updates"
+  type        = bool
+  default     = true
+}
