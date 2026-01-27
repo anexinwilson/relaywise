@@ -17,6 +17,7 @@ type AgentResponse {
   success: Boolean
   response: String
   rag_tools_found: Int
+  rag_tool_names: [String]
   error: String
 }
 

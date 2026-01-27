@@ -75,6 +75,20 @@ resource "aws_cloudformation_stack" "appsync_events" {
         }
       }
     }
+    Outputs = {
+      EventAPIId = {
+        Value = { "Fn::GetAtt" = ["AgentEventsAPI", "ApiId"] }
+      }
+      ApiKey = {
+        Value = { "Fn::GetAtt" = ["EventAPIKey", "ApiKey"] }
+      }
+      WebSocketEndpoint = {
+        Value = { "Fn::Sub" = "wss://$${AgentEventsAPI.Dns.Realtime}/event" }
+      }
+      HttpEndpoint = {
+        Value = { "Fn::Sub" = "https://$${AgentEventsAPI.Dns.Http}" }
+      }
+    }
   })
   tags = {
     Environment = "production"

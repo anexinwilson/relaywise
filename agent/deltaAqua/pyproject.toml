@@ -18,7 +18,7 @@ dependencies = [
     "httpx >= 0.28.1",
     "langchain >= 1.0.3",
     "langchain-google-genai >= 3.0.3",
-    "langchain-mcp-adapters >= 0.1.11",
+    "langchain-mcp-adapters>=0.1.11",
     "langgraph >= 1.0.2",
     "mcp >= 1.19.0",
     "pinecone >= 8.0.0",
@@ -26,5 +26,7 @@ dependencies = [
     "python-dotenv >= 1.2.1",
     "pytest >= 7.0.0",
     "pytest-asyncio >= 0.21.0",
-    "tiktoken==0.11.0"
+    "tiktoken==0.11.0",
+    "composio-langgraph>=0.10.10",
+    "langchain-openai>=1.1.7",
 ]
