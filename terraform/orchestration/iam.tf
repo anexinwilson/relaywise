@@ -1,5 +1,6 @@
 resource "aws_iam_role" "appsync_logs_role" {
   name = "appsync-logs-role"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -13,6 +14,7 @@ resource "aws_iam_role" "appsync_logs_role" {
 resource "aws_iam_role_policy" "appsync_logs" {
   name = "appsync-logs-policy"
   role = aws_iam_role.appsync_logs_role.id
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -29,6 +31,7 @@ resource "aws_iam_role_policy" "appsync_logs" {
 
 resource "aws_iam_role" "appsync_lambda_role" {
   name = "appsync-lambda-role"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -42,6 +45,7 @@ resource "aws_iam_role" "appsync_lambda_role" {
 resource "aws_iam_role_policy" "appsync_lambda_policy" {
   name = "appsync-lambda-policy"
   role = aws_iam_role.appsync_lambda_role.id
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -55,25 +59,13 @@ resource "aws_iam_role_policy" "appsync_lambda_policy" {
 resource "aws_iam_role_policy" "appsync_authorizer_invoke" {
   name = "appsync-authorizer-invoke-policy"
   role = aws_iam_role.appsync_lambda_role.id
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
       Action = ["lambda:InvokeFunction"]
       Resource = ["arn:aws:lambda:${var.aws_region}:*:function:cognive-authorizer"]
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "appsync_agentcore_invoke" {
-  name = "appsync-agentcore-invoke-policy"
-  role = aws_iam_role.appsync_lambda_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["lambda:InvokeFunction"]
-      Resource = ["arn:aws:lambda:${var.aws_region}:*:function:cognive-agentcore-invoker"]
     }]
   })
 }

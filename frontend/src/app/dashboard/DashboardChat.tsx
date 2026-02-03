@@ -13,6 +13,22 @@ const ASK_AGENT_QUERY = gql`
       response
       rag_tools_found
       error
+      taskId
+      sessionId
+    }
+  }
+`;
+
+const TASK_COMPLETE_SUBSCRIPTION = gql`
+  subscription OnTaskComplete($taskId: String) {
+    onTaskComplete(taskId: $taskId) {
+      taskId
+      userId
+      status
+      result
+      error
+      executionTime
+      timestamp
     }
   }
 `;
@@ -31,7 +47,29 @@ interface AskAgentResponse {
     response: string;
     rag_tools_found: number;
     error: string | null;
+    taskId?: string;
+    sessionId?: string;
   };
+}
+
+interface TaskCompletePayload {
+  onTaskComplete: {
+    taskId: string;
+    userId: string;
+    status: string;
+    result: string; // Changed from object to string - it's AWSJSON
+    error: string | null;
+    executionTime: number;
+    timestamp: string;
+  };
+}
+
+interface ParsedResult {
+  response?: string;
+  rag_tools_found?: number;
+  rag_tool_names?: string[];
+  success?: boolean;
+  awaiting_user?: boolean;
 }
 
 interface User {
@@ -43,12 +81,66 @@ export function DashboardChat({ user }: { user: User | null }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const client = useApolloClient();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!activeTaskId) return;
+
+    const subscription = client.subscribe<TaskCompletePayload>({
+      query: TASK_COMPLETE_SUBSCRIPTION,
+      variables: { taskId: activeTaskId },
+    }).subscribe({
+      next: ({ data }) => {
+        if (!data?.onTaskComplete) return;
+
+        const { status, result, error, executionTime } = data.onTaskComplete;
+        const isSuccess = status === 'COMPLETED';
+
+        // Parse the result JSON string
+        let parsedResult: ParsedResult | null = null;
+        try {
+          parsedResult = result ? JSON.parse(result) : null;
+        } catch (err) {
+          console.error('Failed to parse result JSON:', err);
+        }
+
+        setMessages((prev) => [...prev, {
+          id: `msg-${Date.now()}`,
+          sender: isSuccess ? 'ai' : 'error',
+          content: isSuccess
+            ? (parsedResult?.response || 'Task completed')
+            : 'Agent Error',
+          details: isSuccess
+            ? `Found ${parsedResult?.rag_tools_found || 0} tools · ${executionTime}ms`
+            : error || 'Unknown error',
+          timestamp: new Date(),
+        }]);
+
+        setActiveTaskId(null);
+        setIsLoading(false);
+      },
+      error: (err) => {
+        console.error('Subscription error:', err);
+        setMessages((prev) => [...prev, {
+          id: `msg-${Date.now()}`,
+          sender: 'error',
+          content: 'Subscription Error',
+          details: err.message || 'Lost connection to real-time updates',
+          timestamp: new Date(),
+        }]);
+        setActiveTaskId(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [activeTaskId, client]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -78,15 +170,22 @@ export function DashboardChat({ user }: { user: User | null }) {
           details: errorMsg,
           timestamp: new Date(),
         }]);
+        setIsLoading(false);
       } else if (result.data?.askAgent) {
-        const { success, response, error, rag_tools_found } = result.data.askAgent;
-        setMessages((prev) => [...prev, {
-          id: `msg-${Date.now()}`,
-          sender: success ? 'ai' : 'error',
-          content: success ? response : 'Agent Error',
-          details: success ? `Found ${rag_tools_found} tools` : error || 'Unknown error',
-          timestamp: new Date(),
-        }]);
+        const { success, response, error, rag_tools_found, taskId } = result.data.askAgent;
+
+        if (taskId) {
+          setActiveTaskId(taskId);
+        } else {
+          setMessages((prev) => [...prev, {
+            id: `msg-${Date.now()}`,
+            sender: success ? 'ai' : 'error',
+            content: success ? response : 'Agent Error',
+            details: success ? `Found ${rag_tools_found} tools` : error || 'Unknown error',
+            timestamp: new Date(),
+          }]);
+          setIsLoading(false);
+        }
       }
     } catch (error) {
       setMessages((prev) => [...prev, {
@@ -96,7 +195,6 @@ export function DashboardChat({ user }: { user: User | null }) {
         details: (error as Error).message,
         timestamp: new Date(),
       }]);
-    } finally {
       setIsLoading(false);
     }
   };

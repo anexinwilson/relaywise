@@ -1,22 +1,18 @@
 "use client";
 
-import { ApolloClient, InMemoryCache, ApolloLink, HttpLink } from "@apollo/client/core";
+import { ApolloClient, InMemoryCache, HttpLink, split } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
 
 const httpLink = new HttpLink({
   uri: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || "https://bszu7pupljfg5hnlbfch6ccmfi.appsync-api.us-east-1.amazonaws.com/graphql",
-  // Remove credentials: "include" line - it's not needed for JWT auth
 });
 
-// Auth link that receives the token as a parameter
 const createAuthLink = (getToken: () => Promise<string | null>) => {
   return setContext(async (_, { headers }) => {
     try {
       const token = await getToken();
-      
-      console.log('=== Apollo Auth Link ===');
-      console.log('Token obtained:', !!token);
-      console.log('Token preview:', token ? token.substring(0, 50) + '...' : 'none');
       
       return {
         headers: {
@@ -31,11 +27,39 @@ const createAuthLink = (getToken: () => Promise<string | null>) => {
   });
 };
 
+const createAppSyncLink = () => {
+  const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY || '';
+  const endpoint = process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || '';
+  
+  const region = 'us-east-1';
+
+  const subscriptionLink = createSubscriptionHandshakeLink({
+    url: endpoint,
+    region: region,
+    auth: {
+      type: 'API_KEY',
+      apiKey: apiKey,
+    },
+  });
+
+  return subscriptionLink;
+};
+
 export function createApolloClient(getToken: () => Promise<string | null>) {
   const authLink = createAuthLink(getToken);
+  const subscriptionLink = createAppSyncLink();
+
+  const splitLink = split(
+    ({ query }) => {
+      const definition = getMainDefinition(query);
+      return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
+    },
+    subscriptionLink,
+    authLink.concat(httpLink)
+  );
   
   return new ApolloClient({
-    link: authLink.concat(httpLink),
+    link: splitLink,
     cache: new InMemoryCache(),
     defaultOptions: {
       watchQuery: {
