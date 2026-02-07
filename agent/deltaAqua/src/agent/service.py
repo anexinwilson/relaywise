@@ -96,41 +96,47 @@ class MCPSessionManager:
         self.composio = get_composio_client()
         self._sessions = {}
     
-    async def get_tools_for_toolkit(self, user_id: str, toolkit: str) -> List[Any]:
-        if not toolkit:
+    async def get_tools_for_toolkits(self, user_id: str, toolkits: List[str]) -> List[Any]:
+        if not toolkits:
             return []
         
-        try:
-            session = self.composio.create(
-                user_id=user_id,
-                toolkits=[toolkit],
-                manage_connections={
-                    "callback_url": settings.CALLBACK_URL
-                }
-            )
-            
-            mcp_client = MultiServerMCPClient({
-                "composio": {
-                    "transport": "streamable_http",
-                    "url": session.mcp.url,
-                    "headers": session.mcp.headers,
-                }
-            })
-            
-            tools = await mcp_client.get_tools()
-            return tools
-        except Exception as e:
-            logger.error(f"MCP session failed for {toolkit}: {e}")
-            return []
+        all_tools = []
+        
+        for toolkit in toolkits:
+            try:
+                session = self.composio.create(
+                    user_id=user_id,
+                    toolkits=[toolkit],
+                    manage_connections={
+                        "callback_url": settings.CALLBACK_URL
+                    }
+                )
+                
+                mcp_client = MultiServerMCPClient({
+                    "composio": {
+                        "transport": "streamable_http",
+                        "url": session.mcp.url,
+                        "headers": session.mcp.headers,
+                    }
+                })
+                
+                tools = await mcp_client.get_tools()
+                all_tools.extend(tools)
+                logger.info(f"Fetched {len(tools)} tools from {toolkit}")
+            except Exception as e:
+                logger.error(f"MCP session failed for {toolkit}: {e}")
+                continue
+        
+        return all_tools
 
 class AgentService:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-5-mini",
+            model="gpt-4o-mini",
             api_key=settings.OPENAI_API_KEY,
             temperature=0
         )
-        logger.info("Initialized with gpt-5-mini")
+        logger.info("Initialized with gpt-4o-mini")
         
         self.rag = RAGClient()
         self.mcp = MCPSessionManager()
@@ -138,6 +144,7 @@ class AgentService:
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str) -> Dict[str, Any]:
         start = time.time()
         try:
+            # RAG search with top-10 instead of top-3
             rag_tools = self.rag.search_tools(user_message, top_k=10)
             
             if not rag_tools:
@@ -149,18 +156,24 @@ class AgentService:
                     "success": True
                 }
             
-            toolkit = rag_tools[0]["toolkit"]
+            # Get all unique toolkits from top-10 RAG results
+            toolkits = list(set([t["toolkit"] for t in rag_tools]))
+            logger.info(f"RAG found {len(rag_tools)} tools from toolkits: {toolkits}")
             
-            tools = await self.mcp.get_tools_for_toolkit(user_id, toolkit)
+            # Fetch tools from ALL relevant toolkits
+            tools = await self.mcp.get_tools_for_toolkits(user_id, toolkits)
             
             if not tools:
+                toolkit_list = ", ".join(toolkits)
                 return {
-                    "response": f"Failed to initialize {toolkit} tools. You may need to connect your account.",
+                    "response": f"Failed to initialize tools for {toolkit_list}. You may need to connect your accounts.",
                     "awaiting_user": True,
                     "rag_tools_found": len(rag_tools),
                     "rag_tool_names": [t["tool_slug"] for t in rag_tools],
                     "success": False
                 }
+            
+            logger.info(f"Total MCP tools available: {len(tools)}")
             
             model_with_tools = self.llm.bind_tools(tools)
             tool_node = ToolNode(tools)
