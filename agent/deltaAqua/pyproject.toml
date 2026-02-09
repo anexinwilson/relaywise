@@ -29,4 +29,7 @@ dependencies = [
     "tiktoken==0.11.0",
     "composio-langgraph>=0.10.10",
     "langchain-openai>=1.1.7",
+    "instructor>=1.14.5",
+    "pydantic>=2.12.5",
+    "langgraph-checkpoint-aws>=1.0.4",
 ]

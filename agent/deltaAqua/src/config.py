@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     PINECONE_INDEX_NAME: str
     PINECONE_CONNECTION_STRING: str
     CALLBACK_URL: str
+    AWS_REGION: str = 'us-east-1'
+    BEDROCK_MODEL_ID: str
+    AGENTCORE_MEMORY_ID: str
 
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 

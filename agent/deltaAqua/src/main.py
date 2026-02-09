@@ -55,7 +55,6 @@ def publish_task_complete(task_id: str, user_id: str, status: str, result=None, 
             "executionTime": execution_time
         }
         
-        # Remove None values
         detail = {k: v for k, v in detail.items() if v is not None}
         
         eventbridge.put_events(
