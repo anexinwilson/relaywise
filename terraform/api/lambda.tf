@@ -50,6 +50,25 @@ resource "aws_lambda_function" "cognive_lambda" {
   depends_on = [aws_cloudwatch_log_group.cognive_lambda_logs]
 }
 
+resource "aws_lambda_function_url" "cognive_lambda_url" {
+  function_name      = aws_lambda_function.cognive_lambda.function_name
+  authorization_type = "NONE"
+  
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["POST"]
+    allow_headers = ["*"]
+  }
+}
+
+resource "aws_lambda_permission" "cognive_lambda_url_permission" {
+  statement_id           = "AllowPublicInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.cognive_lambda.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
 resource "aws_lambda_function" "token_manager" {
   function_name = "cognive-token-manager"
   role          = aws_iam_role.lambda_role.arn

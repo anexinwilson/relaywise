@@ -1,0 +1,361 @@
+{
+  "popular": [
+    {
+      "id": "discord",
+      "name": "Discord",
+      "description": "Team communication and communities",
+      "logo": "https://logo.clearbit.com/discord.com",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Team messaging and collaboration",
+      "logo": "https://logo.clearbit.com/slack.com",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Notes, docs, and project management",
+      "logo": "https://logo.clearbit.com/notion.so",
+      "category": "productivity",
+      "supportsRealtime": false
+    },
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "description": "Email communication by Google",
+      "logo": "https://logo.clearbit.com/gmail.com",
+      "category": "email",
+      "supportsRealtime": true
+    },
+    {
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "description": "Professional networking platform",
+      "logo": "https://logo.clearbit.com/linkedin.com",
+      "category": "social",
+      "supportsRealtime": false
+    },
+    {
+      "id": "twitter",
+      "name": "Twitter/X",
+      "description": "Social media and microblogging",
+      "logo": "https://logo.clearbit.com/x.com",
+      "category": "social",
+      "supportsRealtime": true
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Code hosting and collaboration",
+      "logo": "https://logo.clearbit.com/github.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "google-calendar",
+      "name": "Google Calendar",
+      "description": "Calendar and scheduling",
+      "logo": "https://logo.clearbit.com/calendar.google.com",
+      "category": "productivity",
+      "supportsRealtime": true
+    },
+    {
+      "id": "trello",
+      "name": "Trello",
+      "description": "Visual project management",
+      "logo": "https://logo.clearbit.com/trello.com",
+      "category": "productivity",
+      "supportsRealtime": false
+    },
+    {
+      "id": "asana",
+      "name": "Asana",
+      "description": "Work management platform",
+      "logo": "https://logo.clearbit.com/asana.com",
+      "category": "productivity",
+      "supportsRealtime": false
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "description": "Cloud-based messaging",
+      "logo": "https://logo.clearbit.com/telegram.org",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "teams",
+      "name": "Microsoft Teams",
+      "description": "Business communication platform",
+      "logo": "https://logo.clearbit.com/microsoft.com",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "todoist",
+      "name": "Todoist",
+      "description": "Task management app",
+      "logo": "https://logo.clearbit.com/todoist.com",
+      "category": "productivity",
+      "supportsRealtime": false
+    },
+    {
+      "id": "outlook",
+      "name": "Outlook",
+      "description": "Email and calendar by Microsoft",
+      "logo": "https://logo.clearbit.com/outlook.com",
+      "category": "email",
+      "supportsRealtime": true
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "description": "Cloud file storage",
+      "logo": "https://logo.clearbit.com/dropbox.com",
+      "category": "storage",
+      "supportsRealtime": false
+    },
+    {
+      "id": "google-drive",
+      "name": "Google Drive",
+      "description": "Cloud storage by Google",
+      "logo": "https://logo.clearbit.com/drive.google.com",
+      "category": "storage",
+      "supportsRealtime": true
+    },
+    {
+      "id": "airtable",
+      "name": "Airtable",
+      "description": "Spreadsheet-database hybrid",
+      "logo": "https://logo.clearbit.com/airtable.com",
+      "category": "productivity",
+      "supportsRealtime": true
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "description": "CRM and marketing platform",
+      "logo": "https://logo.clearbit.com/hubspot.com",
+      "category": "crm",
+      "supportsRealtime": false
+    },
+    {
+      "id": "salesforce",
+      "name": "Salesforce",
+      "description": "Enterprise CRM solution",
+      "logo": "https://logo.clearbit.com/salesforce.com",
+      "category": "crm",
+      "supportsRealtime": false
+    },
+    {
+      "id": "jira",
+      "name": "Jira",
+      "description": "Issue and project tracking",
+      "logo": "https://logo.clearbit.com/atlassian.com",
+      "category": "developer",
+      "supportsRealtime": false
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "description": "Collaborative design tool",
+      "logo": "https://logo.clearbit.com/figma.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "description": "Payment processing",
+      "logo": "https://logo.clearbit.com/stripe.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "shopify",
+      "name": "Shopify",
+      "description": "E-commerce platform",
+      "logo": "https://logo.clearbit.com/shopify.com",
+      "category": "crm",
+      "supportsRealtime": true
+    },
+    {
+      "id": "zoom",
+      "name": "Zoom",
+      "description": "Video conferencing",
+      "logo": "https://logo.clearbit.com/zoom.us",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "instagram",
+      "name": "Instagram",
+      "description": "Photo and video sharing",
+      "logo": "https://logo.clearbit.com/instagram.com",
+      "category": "social",
+      "supportsRealtime": false
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "description": "Video hosting platform",
+      "logo": "https://logo.clearbit.com/youtube.com",
+      "category": "social",
+      "supportsRealtime": false
+    },
+    {
+      "id": "mailchimp",
+      "name": "Mailchimp",
+      "description": "Email marketing platform",
+      "logo": "https://logo.clearbit.com/mailchimp.com",
+      "category": "email",
+      "supportsRealtime": false
+    },
+    {
+      "id": "sendgrid",
+      "name": "SendGrid",
+      "description": "Email delivery service",
+      "logo": "https://logo.clearbit.com/sendgrid.com",
+      "category": "email",
+      "supportsRealtime": true
+    },
+    {
+      "id": "zendesk",
+      "name": "Zendesk",
+      "description": "Customer service platform",
+      "logo": "https://logo.clearbit.com/zendesk.com",
+      "category": "crm",
+      "supportsRealtime": true
+    },
+    {
+      "id": "intercom",
+      "name": "Intercom",
+      "description": "Customer messaging platform",
+      "logo": "https://logo.clearbit.com/intercom.com",
+      "category": "crm",
+      "supportsRealtime": true
+    },
+    {
+      "id": "aws-s3",
+      "name": "AWS S3",
+      "description": "Cloud object storage",
+      "logo": "https://logo.clearbit.com/aws.amazon.com",
+      "category": "storage",
+      "supportsRealtime": false
+    },
+    {
+      "id": "mongodb",
+      "name": "MongoDB",
+      "description": "NoSQL database",
+      "logo": "https://logo.clearbit.com/mongodb.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "description": "Frontend deployment platform",
+      "logo": "https://logo.clearbit.com/vercel.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "description": "Web deployment platform",
+      "logo": "https://logo.clearbit.com/netlify.com",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit",
+      "description": "Social news aggregation",
+      "logo": "https://logo.clearbit.com/reddit.com",
+      "category": "social",
+      "supportsRealtime": true
+    },
+    {
+      "id": "pinterest",
+      "name": "Pinterest",
+      "description": "Visual discovery platform",
+      "logo": "https://logo.clearbit.com/pinterest.com",
+      "category": "social",
+      "supportsRealtime": false
+    },
+    {
+      "id": "twilio",
+      "name": "Twilio",
+      "description": "Communication APIs",
+      "logo": "https://logo.clearbit.com/twilio.com",
+      "category": "communication",
+      "supportsRealtime": true
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "description": "Modern issue tracking",
+      "logo": "https://logo.clearbit.com/linear.app",
+      "category": "developer",
+      "supportsRealtime": true
+    },
+    {
+      "id": "clickup",
+      "name": "ClickUp",
+      "description": "Productivity platform",
+      "logo": "https://logo.clearbit.com/clickup.com",
+      "category": "productivity",
+      "supportsRealtime": true
+    },
+    {
+      "id": "monday",
+      "name": "Monday.com",
+      "description": "Work operating system",
+      "logo": "https://logo.clearbit.com/monday.com",
+      "category": "productivity",
+      "supportsRealtime": true
+    }
+  ],
+  "categories": {
+    "communication": {
+      "name": "Communication",
+      "icon": "MessageSquare",
+      "apps": ["discord", "slack", "telegram", "teams", "zoom", "twilio"]
+    },
+    "productivity": {
+      "name": "Productivity",
+      "icon": "CheckSquare",
+      "apps": ["notion", "google-calendar", "todoist", "trello", "asana", "airtable", "clickup", "monday"]
+    },
+    "email": {
+      "name": "Email",
+      "icon": "Mail",
+      "apps": ["gmail", "outlook", "mailchimp", "sendgrid"]
+    },
+    "social": {
+      "name": "Social Media",
+      "icon": "Share2",
+      "apps": ["linkedin", "twitter", "instagram", "youtube", "reddit", "pinterest"]
+    },
+    "developer": {
+      "name": "Developer Tools",
+      "icon": "Code",
+      "apps": ["github", "jira", "figma", "stripe", "mongodb", "vercel", "netlify", "linear"]
+    },
+    "storage": {
+      "name": "Cloud Storage",
+      "icon": "Cloud",
+      "apps": ["dropbox", "google-drive", "aws-s3"]
+    },
+    "crm": {
+      "name": "CRM & Sales",
+      "icon": "Users",
+      "apps": ["hubspot", "salesforce", "shopify", "zendesk", "intercom"]
+    }
+  }
+}

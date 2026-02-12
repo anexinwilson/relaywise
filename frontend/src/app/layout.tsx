@@ -1,22 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ApolloProvider } from "./components/ApolloProvider";
+import { ApolloWrapper } from "@/components/ApolloWrapper";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Cognive - Chat With Your Apps. Automate Anything.",
-  description: "MCP-powered. 500+ integrations. Ask anything, do anything. Automate it all.",
+  description:
+    "MCP-powered. 500+ integrations. Ask anything, do anything. Automate it all — in plain English.",
 };
 
 export default function RootLayout({
@@ -24,13 +15,30 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  // If no valid Clerk key, render without Clerk provider (for local dev)
+  if (!publishableKey || publishableKey.startsWith("pk_test_placeholder")) {
+    return (
+      <html lang="en" className="dark">
+        <body className="antialiased">
+          <ApolloWrapper>
+            {children}
+            <Toaster />
+          </ApolloWrapper>
+        </body>
+      </html>
+    );
+  }
+
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          <ApolloProvider>{children}</ApolloProvider>
+    <ClerkProvider publishableKey={publishableKey}>
+      <html lang="en" className="dark">
+        <body className="antialiased">
+          <ApolloWrapper>
+            {children}
+            <Toaster />
+          </ApolloWrapper>
         </body>
       </html>
     </ClerkProvider>

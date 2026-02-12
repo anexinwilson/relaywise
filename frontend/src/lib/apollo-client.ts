@@ -2,18 +2,21 @@
 
 import { ApolloClient, InMemoryCache, HttpLink, split } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
-import { getMainDefinition } from '@apollo/client/utilities';
-import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link';
+import { getMainDefinition } from "@apollo/client/utilities";
+import { createSubscriptionHandshakeLink } from "aws-appsync-subscription-link";
 
+// Match the working frontenda Apollo client: AppSync endpoint + Lambda auth via Clerk JWT
 const httpLink = new HttpLink({
-  uri: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || "https://bszu7pupljfg5hnlbfch6ccmfi.appsync-api.us-east-1.amazonaws.com/graphql",
+  uri:
+    process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT ||
+    "https://bszu7pupljfg5hnlbfch6ccmfi.appsync-api.us-east-1.amazonaws.com/graphql",
 });
 
 const createAuthLink = (getToken: () => Promise<string | null>) => {
   return setContext(async (_, { headers }) => {
     try {
       const token = await getToken();
-      
+
       return {
         headers: {
           ...headers,
@@ -28,17 +31,16 @@ const createAuthLink = (getToken: () => Promise<string | null>) => {
 };
 
 const createAppSyncLink = () => {
-  const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY || '';
-  const endpoint = process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || '';
-  
-  const region = 'us-east-1';
+  const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY || "";
+  const endpoint = process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || "";
+  const region = "us-east-1";
 
   const subscriptionLink = createSubscriptionHandshakeLink({
     url: endpoint,
-    region: region,
+    region,
     auth: {
-      type: 'API_KEY',
-      apiKey: apiKey,
+      type: "API_KEY",
+      apiKey,
     },
   });
 
@@ -52,12 +54,15 @@ export function createApolloClient(getToken: () => Promise<string | null>) {
   const splitLink = split(
     ({ query }) => {
       const definition = getMainDefinition(query);
-      return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
+      return (
+        definition.kind === "OperationDefinition" &&
+        definition.operation === "subscription"
+      );
     },
     subscriptionLink,
     authLink.concat(httpLink)
   );
-  
+
   return new ApolloClient({
     link: splitLink,
     cache: new InMemoryCache(),

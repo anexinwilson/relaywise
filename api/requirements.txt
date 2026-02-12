@@ -12,3 +12,4 @@ upstash-redis
 clerk-backend-api
 pydantic-settings
 alembic
+svix
