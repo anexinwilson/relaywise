@@ -34,6 +34,7 @@ import { useAppStore, useConnectedIntegrations } from "@/store/appStore";
 import {
   ASK_AGENT_QUERY,
   TASK_COMPLETE_SUBSCRIPTION,
+  GET_USER_CONVERSATIONS,
 } from "@/lib/graphql-queries";
 import { cn } from "@/lib/utils";
 import type {
@@ -113,6 +114,20 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const [askAgent] = useLazyQuery<{ askAgent: AgentResponse }, { message: string }>(
     ASK_AGENT_QUERY
   );
+
+  const [loadConversations, { data: conversationsData }] = useLazyQuery(GET_USER_CONVERSATIONS);
+
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    }
+  }, [user, loadConversations]);
+
+  useEffect(() => {
+    if (conversationsData?.getUserConversations) {
+      console.log('Loaded conversations:', conversationsData.getUserConversations);
+    }
+  }, [conversationsData]);
 
   // Handle pre-filled message from landing page
   useEffect(() => {

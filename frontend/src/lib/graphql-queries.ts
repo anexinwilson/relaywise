@@ -38,3 +38,13 @@ export const GET_OR_CREATE_USER = gql`
     }
   }
 `;
+
+export const GET_USER_CONVERSATIONS = gql`
+  query GetUserConversations {
+    getUserConversations {
+      sessionId
+      chatName
+      createdAt
+    }
+  }
+`;

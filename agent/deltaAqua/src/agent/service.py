@@ -19,6 +19,8 @@ import instructor
 
 from config import settings
 from utils import get_logger
+from memory import ChatMemory
+from agent.chat_namer import ChatNamer
 
 logger = get_logger(__name__)
 
@@ -33,6 +35,13 @@ def get_bedrock_client():
     if _bedrock_client is None:
         _bedrock_client = boto3.client('bedrock-runtime', region_name=settings.AWS_REGION)
     return _bedrock_client
+
+_memory_client = None
+def get_memory_client():
+    global _memory_client
+    if _memory_client is None:
+        _memory_client = boto3.client('bedrock-agent-runtime', region_name=settings.AWS_REGION)
+    return _memory_client
 
 def get_pinecone_index():
     global _pinecone_index
@@ -316,12 +325,21 @@ class AgentService:
         self.composio = get_composio_client()
         self.analysis_agent = AnalysisAgent()
         self.execution_agent = ExecutionAgent()
+        self.chat_memory = ChatMemory()
+        self.chat_namer = ChatNamer()
         logger.info("Initialized 2-agent system with AgentCore Memory")
     
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str) -> dict:
         start = time.time()
         
         try:
+            if self.chat_memory.is_first_message(user_id, conversation_id):
+                chat_name = await self.chat_namer.generate_chat_name(user_message)
+                try:
+                    self.chat_memory.store_chat_title(user_id, conversation_id, chat_name)
+                except Exception as e:
+                    logger.error(f"Failed to store chat name: {e}")
+            
             rag_tools = self.rag.search_tools(user_message, top_k=15)
             
             if not rag_tools:

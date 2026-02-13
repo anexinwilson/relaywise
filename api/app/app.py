@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.database import Base, engine, get_db, User
 from app.resolvers import user as user_resolver
+from app.resolvers import conversation as conversation_resolver
 from app.config.settings import settings
 from svix.webhooks import Webhook
 import json
@@ -71,6 +72,9 @@ async def graphql_resolver(event: dict):
             
             if field_name == "getOrCreateUser":
                 result = await user_resolver.get_or_create_user(user_id, db)
+                return result
+            elif field_name == "getUserConversations":
+                result = await conversation_resolver.get_user_conversations(None, None, user_id)
                 return result
             else:
                 return {"error": f"Unknown field: {field_name}", "success": False}
