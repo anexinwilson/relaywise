@@ -61,23 +61,40 @@ async def clerk_webhook(request: Request):
     return {"success": True}
 
 
-async def graphql_resolver(event: dict):
+def graphql_resolver(event: dict):
     field_name = event.get("info", {}).get("fieldName")
     user_id = event.get("request", {}).get("headers", {}).get("userId")
     
     try:
-        async for db in get_db():
-            if user_id:
-                await user_resolver.get_or_create_user(user_id, db)
-            
-            if field_name == "getOrCreateUser":
-                result = await user_resolver.get_or_create_user(user_id, db)
-                return result
-            elif field_name == "getUserConversations":
-                result = await conversation_resolver.get_user_conversations(None, None, user_id)
-                return result
-            else:
-                return {"error": f"Unknown field: {field_name}", "success": False}
+        if field_name == "getOrCreateUser":
+            # This is async because it needs database
+            import asyncio
+            async def get_user():
+                async for db in get_db():
+                    result = await user_resolver.get_or_create_user(user_id, db)
+                    return result
+            return asyncio.run(get_user())
+        elif field_name == "getUserConversations":
+            if not user_id:
+                return []
+            result = conversation_resolver.get_user_conversations(None, None, user_id)
+            if isinstance(result, dict) and 'conversations' in result:
+                return result['conversations']
+            return result
+        elif field_name == "getConversationMessages":
+            if not user_id:
+                return []
+            arguments = event.get("arguments", {})
+            session_id = arguments.get("sessionId")
+            if not session_id:
+                return []
+            result = conversation_resolver.get_conversation_messages(None, None, user_id, session_id)
+            return result
+        else:
+            return []
     
     except Exception as e:
+        print(f"Error in graphql_resolver: {e}")
+        if field_name in ["getUserConversations", "getConversationMessages"]:
+            return []
         return {"error": str(e), "success": False}

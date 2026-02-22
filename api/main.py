@@ -7,8 +7,10 @@ mangum_handler = Mangum(app)
 
 def handler(event, context):
     if "info" in event and "fieldName" in event.get("info", {}):
-        return asyncio.run(graphql_resolver(event))
+        # This is a GraphQL request
+        return graphql_resolver(event)
     else:
+        # This is an HTTP request (for webhooks, etc.)
         return mangum_handler(event, context)
 
 if __name__ == "__main__":

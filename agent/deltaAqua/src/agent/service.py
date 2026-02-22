@@ -315,8 +315,6 @@ PARAMETER EXTRACTION:
         if isinstance(final, list):
             final = ''.join([p.get('text', '') if isinstance(p, dict) else str(p) for p in final])
         
-        asyncio.create_task(self._create_event(user_id, conversation_id, [(user_message, "USER"), (final, "ASSISTANT")]))
-        
         return final
 
 class AgentService:
@@ -331,7 +329,7 @@ class AgentService:
     
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str) -> dict:
         start = time.time()
-        
+        chat_name = None
         try:
             if self.chat_memory.is_first_message(user_id, conversation_id):
                 chat_name = await self.chat_namer.generate_chat_name(user_message)
@@ -348,7 +346,8 @@ class AgentService:
                     "awaiting_user": False,
                     "rag_tools_found": 0,
                     "rag_tool_names": [],
-                    "success": True
+                    "success": True,
+                    "chatName": chat_name
                 }
             
             logger.info(f"RAG: {len(rag_tools)} tools")
@@ -380,7 +379,8 @@ class AgentService:
                     "awaiting_user": True,
                     "rag_tools_found": len(rag_tools),
                     "rag_tool_names": [t.tool_slug for t in rag_tools],
-                    "success": False
+                    "success": False,
+                    "chatName": chat_name
                 }
             
             if not tools:
@@ -389,12 +389,16 @@ class AgentService:
                     "awaiting_user": True,
                     "rag_tools_found": len(rag_tools),
                     "rag_tool_names": [t.tool_slug for t in rag_tools],
-                    "success": False
+                    "success": False,
+                    "chatName": chat_name
                 }
             
             logger.info(f"Loaded {len(tools)} tools from {', '.join(analysis.relevant_toolkits)}")
             
             final = await self.execution_agent.execute(user_message, tools, user_id, conversation_id)
+            
+            # Messages are automatically stored by AgentCoreMemorySaver in the workflow
+            # No manual storage needed - they're already in readable conversational format
             
             logger.info(f"Completed in {time.time() - start:.2f}s")
             
@@ -404,7 +408,8 @@ class AgentService:
                 "rag_tools_found": len(rag_tools),
                 "rag_tool_names": [t.tool_slug for t in rag_tools],
                 "toolkits_used": analysis.relevant_toolkits,
-                "success": True
+                "success": True,
+                "chatName": chat_name
             }
             
         except Exception as e:
@@ -414,7 +419,8 @@ class AgentService:
                 "awaiting_user": False,
                 "rag_tools_found": 0,
                 "rag_tool_names": [],
-                "success": False
+                "success": False,
+                "chatName": chat_name
             }
 
 _agent_service = None

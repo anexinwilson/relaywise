@@ -35,6 +35,7 @@ import {
   ASK_AGENT_QUERY,
   TASK_COMPLETE_SUBSCRIPTION,
   GET_USER_CONVERSATIONS,
+  GET_CONVERSATION_MESSAGES,
 } from "@/lib/graphql-queries";
 import { cn } from "@/lib/utils";
 import type {
@@ -116,6 +117,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   );
 
   const [loadConversations, { data: conversationsData }] = useLazyQuery(GET_USER_CONVERSATIONS);
+  const [loadMessages] = useLazyQuery(GET_CONVERSATION_MESSAGES);
 
   useEffect(() => {
     if (user) {
@@ -126,6 +128,33 @@ export function DashboardClient({ user }: DashboardClientProps) {
   useEffect(() => {
     if (conversationsData?.getUserConversations) {
       console.log('Loaded conversations:', conversationsData.getUserConversations);
+      
+      // Convert AgentCore conversations to Task format
+      const conversationTasks: Task[] = conversationsData.getUserConversations.map((conv: any) => ({
+        id: conv.sessionId,
+        name: conv.chatName || 'New Conversation',
+        status: 'paused' as TaskStatus,
+        type: 'automation' as const,
+        createdAt: conv.createdAt,
+        lastRun: '',
+        connectedApps: [],
+        description: conv.chatName || 'Conversation',
+        chatHistory: [],
+        compiledWorkflow: {
+          trigger: { type: 'polling', interval: '', app: '' },
+          steps: [],
+          errorHandling: {},
+        },
+        logs: [],
+        stats: { totalRuns: 0 },
+      }));
+      
+      setTasks(conversationTasks);
+      
+      // Set the first conversation as current if none selected
+      if (conversationTasks.length > 0 && !currentTaskId) {
+        setCurrentTask(conversationTasks[0].id);
+      }
     }
   }, [conversationsData]);
 
@@ -180,6 +209,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             task.id === currentTask.id
               ? {
                   ...task,
+                  name: parsedResult?.chatName ?? task.name,
                   chatHistory: [...task.chatHistory, assistantMessage],
                   status: isSuccess ? "completed" : "failed",
                   lastRun: timestamp,
@@ -188,7 +218,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
           )
         );
 
-        // Clear subscription and loading state
         setCurrentSubscriptionTaskId(null);
         setIsTyping(false);
       },
@@ -511,9 +540,36 @@ export function DashboardClient({ user }: DashboardClientProps) {
     }
   };
 
-  const handleTaskClick = (taskId: string) => {
+  const handleTaskClick = async (taskId: string) => {
     resetConversationState();
     setCurrentTask(taskId);
+    
+    // Load messages for this conversation
+    try {
+      const { data } = await loadMessages({
+        variables: { sessionId: taskId },
+      });
+      
+      if (data?.getConversationMessages) {
+        const messages: ChatMessage[] = data.getConversationMessages.map((msg: any) => ({
+          id: msg.id,
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }));
+        
+        // Update the task with loaded messages
+        setTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? { ...task, chatHistory: messages }
+              : task
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
   };
 
   const handleToggleStatus = () => {

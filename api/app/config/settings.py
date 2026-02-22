@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str
     CLERK_WEBHOOK_SECRET: str
     CLERK_DOMAIN: str
+    AGENTCORE_MEMORY_ID: str = ""
     
     model_config = SettingsConfigDict(
         env_file=".env",

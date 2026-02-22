@@ -54,6 +54,29 @@ resource "aws_iam_role_policy" "lambda_agentcore_policy" {
   })
 }
 
+# Lambda policy to access AgentCore Memory
+resource "aws_iam_role_policy" "lambda_agentcore_memory_policy" {
+  name = "lambda-agentcore-memory-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:ListSessions",
+          "bedrock-agentcore:ListEvents",
+          "bedrock-agentcore:CreateEvent",
+          "bedrock-agentcore:GetMemory",
+          "bedrock-agentcore:RetrieveMemory"
+        ]
+        Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:*:memory/*"
+      }
+    ]
+  })
+}
+
 # Authorizer execution role
 resource "aws_iam_role" "authorizer_role" {
   name = "cognive-authorizer-role"

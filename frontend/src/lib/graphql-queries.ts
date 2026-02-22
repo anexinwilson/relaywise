@@ -48,3 +48,15 @@ export const GET_USER_CONVERSATIONS = gql`
     }
   }
 `;
+
+export const GET_CONVERSATION_MESSAGES = gql`
+  query GetConversationMessages($sessionId: String!) {
+    getConversationMessages(sessionId: $sessionId) {
+      id
+      sender
+      content
+      timestamp
+      type
+    }
+  }
+`;

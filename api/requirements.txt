@@ -1,4 +1,5 @@
 boto3
+bedrock-agentcore
 fastapi[standard]
 uvicorn
 mangum

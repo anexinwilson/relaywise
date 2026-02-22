@@ -37,7 +37,8 @@ resource "aws_lambda_function" "authorizer" {
 resource "aws_lambda_function" "cognive_lambda" {
   function_name = "cognive-lambda"
   role          = aws_iam_role.lambda_role.arn
-  timeout       = 30
+  timeout       = 120
+  memory_size   = 512
 
   image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-lambda"
   package_type = "Image"

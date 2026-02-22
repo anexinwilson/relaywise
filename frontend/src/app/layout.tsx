@@ -21,7 +21,7 @@ export default function RootLayout({
   if (!publishableKey || publishableKey.startsWith("pk_test_placeholder")) {
     return (
       <html lang="en" className="dark">
-        <body className="antialiased">
+        <body className="antialiased" suppressHydrationWarning>
           <ApolloWrapper>
             {children}
             <Toaster />
@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <html lang="en" className="dark">
-        <body className="antialiased">
+        <body className="antialiased" suppressHydrationWarning>
           <ApolloWrapper>
             {children}
             <Toaster />
