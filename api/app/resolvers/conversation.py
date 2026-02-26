@@ -13,6 +13,7 @@ bedrock_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
 
 def get_user_conversations(obj, info, userId: str) -> List[Dict]:
     try:
+        print(f"=== API USING MEMORY ID: {AGENTCORE_MEMORY_ID} ===")
         if not AGENTCORE_MEMORY_ID:
             return []
         
@@ -42,7 +43,8 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
                 elif created_at is not None:
                     created_at = str(created_at)
                 
-                chat_name = _get_chat_name_from_metadata(userId, session_id)
+                # Get first message as chat name
+                chat_name = _get_first_message_as_chat_name(userId, session_id)
                 
                 all_sessions.append({
                     'sessionId': session_id,
@@ -59,68 +61,37 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
         print(f"Error fetching conversations: {e}")
         return []
 
-def _get_chat_name_from_summaries(userId: str, sessionId: str) -> str:
+def _get_first_message_as_chat_name(userId: str, sessionId: str) -> str:
+    """Get Message 0 (oldest message) as chat name"""
     try:
-        return _get_chat_name_from_metadata(userId, sessionId)
+        events_response = bedrock_client.list_events(
+            memoryId=AGENTCORE_MEMORY_ID,
+            actorId=userId,
+            sessionId=sessionId,
+            maxResults=100,
+            includePayloads=True
+        )
+        
+        events = events_response.get('events', [])
+        if not events:
+            return None
+        
+        # Events are newest-first, so LAST event is Message 0 (oldest)
+        oldest_event = events[-1]
+        
+        payload = oldest_event.get('payload', [])
+        if payload and isinstance(payload, list):
+            for item in payload:
+                if isinstance(item, dict) and 'conversational' in item:
+                    content = item['conversational'].get('content', {})
+                    if isinstance(content, dict):
+                        return content.get('text', '')
+        
+        return None
+        
     except Exception as e:
         print(f"Error getting chat name for session {sessionId}: {e}")
-        return 'New Conversation'
-
-def _get_chat_name_from_metadata(userId: str, sessionId: str) -> str:
-    try:
-        params = {
-            'memoryId': AGENTCORE_MEMORY_ID,
-            'actorId': userId,
-            'sessionId': sessionId,
-            'maxResults': 10,
-            'includePayloads': False
-        }
-        
-        response = bedrock_client.list_events(**params)
-        events = response.get('events', [])
-        
-        for event in events:
-            if not isinstance(event, dict):
-                continue
-            
-            metadata = event.get('metadata', {})
-            event_type = metadata.get('event_type', {})
-            if isinstance(event_type, dict):
-                event_type_value = event_type.get('stringValue', '')
-            else:
-                event_type_value = str(event_type)
-            
-            if event_type_value == 'chat_title':
-                chat_title = metadata.get('chat_title', {})
-                if isinstance(chat_title, dict):
-                    title = chat_title.get('stringValue', '')
-                else:
-                    title = str(chat_title)
-                if title:
-                    return title
-        
-        if events:
-            params['includePayloads'] = True
-            params['maxResults'] = 50
-            response = bedrock_client.list_events(**params)
-            
-            for event in reversed(response.get('events', [])):
-                payload = event.get('payload', [])
-                if payload and isinstance(payload, list):
-                    for item in payload:
-                        if isinstance(item, dict) and 'conversational' in item:
-                            conv = item['conversational']
-                            role = conv.get('role', '').upper()
-                            if role == 'USER':
-                                content = conv.get('content', {})
-                                text = content.get('text', '') if isinstance(content, dict) else str(content)
-                                if text and len(text) > 0:
-                                    return text[:50] + ('...' if len(text) > 50 else '')
-        
-        return 'New Conversation'
-    except Exception as e:
-        print(f"Error in metadata chat name for session {sessionId}: {e}")
-        return 'New Conversation'
+        return None
 
 def get_conversation_messages(obj, info, userId: str, sessionId: str) -> List[Dict]:
     try:
@@ -147,16 +118,6 @@ def get_conversation_messages(obj, info, userId: str, sessionId: str) -> List[Di
                 if not isinstance(event, dict):
                     continue
                 
-                metadata = event.get('metadata', {})
-                event_type = metadata.get('event_type', {})
-                if isinstance(event_type, dict):
-                    event_type_value = event_type.get('stringValue', '')
-                else:
-                    event_type_value = str(event_type)
-                
-                if event_type_value == 'chat_title':
-                    continue
-                
                 event_id = event.get('eventId')
                 event_timestamp = event.get('eventTimestamp')
                 payload = event.get('payload', [])
@@ -169,17 +130,17 @@ def get_conversation_messages(obj, info, userId: str, sessionId: str) -> List[Di
                     created_at = ''
                 
                 if payload and isinstance(payload, list):
-                    for idx, item in enumerate(payload):
+                    for item in payload:
                         if isinstance(item, dict) and 'conversational' in item:
                             conv = item['conversational']
                             role = conv.get('role', '').upper()
+                            
                             content_data = conv.get('content', {})
                             content = content_data.get('text', '') if isinstance(content_data, dict) else str(content_data)
                             sender = 'user' if role == 'USER' else 'assistant'
                             
                             if content:
-                                # Create unique ID by combining event_id with index and role
-                                unique_id = f"{event_id}_{idx}_{role.lower()}" if event_id else f"{created_at}_{idx}_{role.lower()}"
+                                unique_id = event_id if event_id else created_at
                                 messages.append({
                                     'id': unique_id,
                                     'sender': sender,

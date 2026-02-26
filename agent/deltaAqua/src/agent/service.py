@@ -315,6 +315,12 @@ PARAMETER EXTRACTION:
         if isinstance(final, list):
             final = ''.join([p.get('text', '') if isinstance(p, dict) else str(p) for p in final])
         
+        from memory.chat_memory import ChatMemory
+        chat_memory = ChatMemory()
+        # Store messages without chat_name in metadata (LTM handles chat names separately)
+        chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
+        chat_memory.store_message(user_id, conversation_id, final, 'ASSISTANT')
+        
         return final
 
 class AgentService:
@@ -327,16 +333,15 @@ class AgentService:
         self.chat_namer = ChatNamer()
         logger.info("Initialized 2-agent system with AgentCore Memory")
     
-    async def execute_task(self, user_message: str, user_id: str, conversation_id: str) -> dict:
+    async def execute_task(self, user_message: str, user_id: str, conversation_id: str, chat_name: str = None) -> dict:
         start = time.time()
-        chat_name = None
         try:
-            if self.chat_memory.is_first_message(user_id, conversation_id):
-                chat_name = await self.chat_namer.generate_chat_name(user_message)
-                try:
-                    self.chat_memory.store_chat_title(user_id, conversation_id, chat_name)
-                except Exception as e:
-                    logger.error(f"Failed to store chat name: {e}")
+            # Always try to get chat name from LTM (more reliable than passed parameter)
+            try:
+                chat_name = self.chat_memory.get_chat_name(user_id, conversation_id)
+            except Exception as e:
+                logger.error(f"Failed to retrieve chat name from LTM: {e}")
+                # If LTM fails, use passed chat_name as fallback
             
             rag_tools = self.rag.search_tools(user_message, top_k=15)
             

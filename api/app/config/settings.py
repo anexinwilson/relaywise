@@ -1,7 +1,7 @@
 import json
 import boto3
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 def get_secret():
     client = boto3.client('secretsmanager', region_name='us-east-1')
@@ -12,6 +12,7 @@ def get_secret():
         raise RuntimeError(f"Failed to retrieve secrets: {str(e)}")
 
 class Settings(BaseSettings):
+    AWS_REGION: str = "us-east-1"
     DATABASE_URL: str
     UPSTASH_REDIS_REST_URL: str
     UPSTASH_REDIS_REST_TOKEN: str
@@ -19,18 +20,10 @@ class Settings(BaseSettings):
     CLERK_WEBHOOK_SECRET: str
     CLERK_DOMAIN: str
     AGENTCORE_MEMORY_ID: str = ""
-    
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
-    )
 
 @lru_cache
 def get_settings() -> Settings:
-    try:
-        return Settings()
-    except Exception:
-        secret = get_secret()
-        return Settings(**secret)
+    secret = get_secret()
+    return Settings(**secret)
 
 settings = get_settings()

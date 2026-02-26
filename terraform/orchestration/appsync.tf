@@ -11,7 +11,7 @@ resource "aws_appsync_graphql_api" "main" {
   schema = <<EOF
 type Query {
   hello: String
-  askAgent(message: String!): AgentResponse
+  askAgent(message: String!, sessionId: String): AgentResponse
     @aws_lambda
   getUserConversations: [Conversation]
   getConversationMessages(sessionId: String!): [Message]
@@ -37,6 +37,7 @@ type AgentResponse @aws_lambda {
   error: String
   taskId: String
   sessionId: String
+  chatName: String
 }
 
 type TaskComplete @aws_lambda @aws_api_key {
@@ -148,7 +149,7 @@ export function request(ctx) {
   const payload = {
     action: 'ask_agent',
     userId: ctx.identity.resolverContext.userId,
-    sessionId: ctx.requestId,
+    sessionId: ctx.args.sessionId || null,
     message: ctx.args.message
   };
   return {

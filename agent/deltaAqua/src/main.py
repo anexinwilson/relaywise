@@ -69,14 +69,14 @@ def publish_task_complete(task_id: str, user_id: str, status: str, result=None, 
     except Exception as e:
         logger.error(f"EventBridge publish failed: {e}")
 
-def run_agent_background(task_id: str, agentcore_task_id: str, user_id: str, message: str, session_id: str):
+def run_agent_background(task_id: str, agentcore_task_id: str, user_id: str, message: str, session_id: str, chat_name: str = None):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     start_time = time.time()
     try:
         logger.info(f"[BACKGROUND] Task {task_id} started")
         result = loop.run_until_complete(
-            agent_service.execute_task(user_message=message, user_id=user_id, conversation_id=session_id)
+            agent_service.execute_task(user_message=message, user_id=user_id, conversation_id=session_id, chat_name=chat_name)
         )
         execution_time = int((time.time() - start_time) * 1000)
         publish_task_complete(
@@ -123,13 +123,27 @@ async def ask_agent_handler(payload):
         if not user_id or not message:
             return {"error": "Missing userId or message", "success": False}
 
+        # Get or generate chat name SYNCHRONOUSLY before returning
+        chat_name = None
+        try:
+            # Generate chat name from user message
+            chat_name = await agent_service.chat_namer.generate_chat_name(message)
+            if chat_name:
+                chat_name = chat_name.strip('"\' ').strip()
+                if chat_name:
+                    # Store chat name as FIRST message (Message 0)
+                    agent_service.chat_memory.store_message(user_id, session_id, chat_name, 'ASSISTANT')
+                    logger.info(f"Stored chat name as first message: {chat_name}")
+        except Exception as e:
+            logger.error(f"Chat name generation failed: {e}")
+
         task_id = str(uuid.uuid4())
         agentcore_task_id = app.add_async_task(f"agent_processing_{task_id}")
         task_mapping[task_id] = agentcore_task_id
 
         thread = threading.Thread(
             target=run_agent_background,
-            args=(task_id, agentcore_task_id, user_id, message, session_id),
+            args=(task_id, agentcore_task_id, user_id, message, session_id, chat_name),
             daemon=True
         )
         thread.start()
@@ -142,6 +156,7 @@ async def ask_agent_handler(payload):
             "response": "Processing your request...",
             "rag_tools_found": 0,
             "rag_tool_names": [],
+            "chatName": chat_name,
         }
     except Exception as e:
         logger.error(f"ask_agent error: {e}", exc_info=True)

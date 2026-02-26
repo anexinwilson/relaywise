@@ -1,14 +1,15 @@
 import { gql } from "@apollo/client";
 
 export const ASK_AGENT_QUERY = gql`
-  query AskAgent($message: String!) {
-    askAgent(message: $message) {
+  query AskAgent($message: String!, $sessionId: String) {
+    askAgent(message: $message, sessionId: $sessionId) {
       success
       response
       rag_tools_found
       error
       taskId
       sessionId
+      chatName
     }
   }
 `;
@@ -22,6 +23,17 @@ export const TASK_COMPLETE_SUBSCRIPTION = gql`
       result
       error
       executionTime
+      timestamp
+    }
+  }
+`;
+
+export const CHAT_NAME_CREATE_SUBSCRIPTION = gql`
+  subscription OnChatNameUpdate($sessionId: String) {
+    onChatNameUpdate(sessionId: $sessionId) {
+      userId
+      sessionId
+      chatName
       timestamp
     }
   }
