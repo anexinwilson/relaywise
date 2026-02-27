@@ -152,7 +152,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           status: 'paused' as TaskStatus,
           type: 'automation' as const,
           createdAt: conv.createdAt,
-          lastRun: '',
+          lastRun: conv.createdAt,
           connectedApps: [],
           description: conv.chatName,
           chatHistory: [],
@@ -179,11 +179,14 @@ export function DashboardClient({ user }: DashboardClientProps) {
   useEffect(() => {
     if (!currentSubscriptionTaskId || !currentTask) return;
 
+    console.log('[Subscription] Starting for taskId:', currentSubscriptionTaskId);
+
     const subscription = apolloClient.subscribe<{ onTaskComplete: TaskComplete }>({
       query: TASK_COMPLETE_SUBSCRIPTION,
       variables: { taskId: currentSubscriptionTaskId },
     }).subscribe({
       next: ({ data }) => {
+        console.log('[Subscription] Received data:', data);
         if (!data?.onTaskComplete) return;
 
         const { status, result, error: taskError, timestamp } = data.onTaskComplete;
@@ -231,10 +234,9 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
         setCurrentSubscriptionTaskId(null);
         setIsTyping(false);
-        loadConversations();
       },
       error: (err) => {
-        console.error("[Subscription] Error:", err.message);
+        console.error("[Subscription] Error:", err);
         const errorMessage: ChatMessage = {
           id: `msg_${Date.now() + 1}`,
           role: "assistant",
@@ -244,10 +246,16 @@ export function DashboardClient({ user }: DashboardClientProps) {
         addMessageToConversation(currentTask.id, errorMessage);
         setCurrentSubscriptionTaskId(null);
         setIsTyping(false);
+      },
+      complete: () => {
+        console.log('[Subscription] Completed');
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('[Subscription] Unsubscribing from taskId:', currentSubscriptionTaskId);
+      subscription.unsubscribe();
+    };
   }, [currentSubscriptionTaskId, currentTask, apolloClient, loadConversations, tasks, addConversation, updateConversation, addMessageToConversation]);
 
   const sendMessageToAgent = async (message: string, sessionId?: string): Promise<{ response: string; hasTaskId: boolean; sessionId?: string }> => {

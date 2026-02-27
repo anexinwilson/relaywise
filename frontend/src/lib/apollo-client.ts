@@ -8,8 +8,7 @@ import { createSubscriptionHandshakeLink } from "aws-appsync-subscription-link";
 // Match the working frontenda Apollo client: AppSync endpoint + Lambda auth via Clerk JWT
 const httpLink = new HttpLink({
   uri:
-    process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT ||
-    "https://bszu7pupljfg5hnlbfch6ccmfi.appsync-api.us-east-1.amazonaws.com/graphql",
+    process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT 
 });
 
 const createAuthLink = (getToken: () => Promise<string | null>) => {
@@ -34,6 +33,12 @@ const createAppSyncLink = () => {
   const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY || "";
   const endpoint = process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || "";
   const region = "us-east-1";
+
+  console.log('[Apollo] Subscription config:', {
+    endpoint: endpoint.substring(0, 50) + '...',
+    apiKeyPrefix: apiKey.substring(0, 10) + '...',
+    region
+  });
 
   const subscriptionLink = createSubscriptionHandshakeLink({
     url: endpoint,

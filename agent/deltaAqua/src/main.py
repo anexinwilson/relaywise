@@ -57,17 +57,25 @@ def publish_task_complete(task_id: str, user_id: str, status: str, result=None, 
         
         detail = {k: v for k, v in detail.items() if v is not None}
         
-        eventbridge.put_events(
-            Entries=[{
-                'Source': 'agentcore.tasks',
-                'DetailType': 'Task Complete',
-                'Detail': json.dumps(detail),
-                'EventBusName': EVENTBRIDGE_BUS_NAME
-            }]
-        )
-        logger.info(f"EventBridge event published: {task_id} -> {status}")
+        event_entry = {
+            'Source': 'agentcore.tasks',
+            'DetailType': 'Task Complete',
+            'Detail': json.dumps(detail),
+            'EventBusName': EVENTBRIDGE_BUS_NAME
+        }
+        
+        logger.info(f"Publishing EventBridge event: {json.dumps(event_entry, indent=2)}")
+        
+        response = eventbridge.put_events(Entries=[event_entry])
+        
+        logger.info(f"EventBridge response: {response}")
+        
+        if response.get('FailedEntryCount', 0) > 0:
+            logger.error(f"EventBridge publish failed: {response.get('Entries', [])}")
+        else:
+            logger.info(f"EventBridge event published successfully: {task_id} -> {status}")
     except Exception as e:
-        logger.error(f"EventBridge publish failed: {e}")
+        logger.error(f"EventBridge publish failed: {e}", exc_info=True)
 
 def run_agent_background(task_id: str, agentcore_task_id: str, user_id: str, message: str, session_id: str, chat_name: str = None):
     loop = asyncio.new_event_loop()

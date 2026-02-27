@@ -61,9 +61,9 @@ resource "aws_cloudwatch_event_target" "appsync_target" {
       "taskId": "<taskId>",
       "userId": "<userId>",
       "status": "<status>",
-      "result": <result>,
+      "result": "<result>",
       "error": "<error>",
-      "executionTime": <executionTime>
+      "executionTime": "<executionTime>"
     }
   }
 }
