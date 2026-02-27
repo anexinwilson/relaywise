@@ -18,7 +18,7 @@ def fetch_toolkits():
     cursor = None
     
     while True:
-        params = {"limit": 1000, "include_deprecated": "false"}
+        params = {"limit": 1000, "managed_by": "composio", "include_deprecated": "false"}
         if cursor:
             params["cursor"] = cursor
         
@@ -36,7 +36,7 @@ def fetch_toolkits():
         if not cursor:
             break
     
-    return [t["slug"] for t in all_toolkits]
+    return [t for t in all_toolkits if t.get("composio_managed_auth_schemes")]
 
 def fetch_tools_for_toolkit(toolkit_slug):
     all_tools = []
@@ -67,20 +67,23 @@ def fetch_tools_for_toolkit(toolkit_slug):
             if not cursor:
                 break
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error fetching {toolkit_slug}: {e}")
             break
     
     return all_tools
 
 print("Fetching toolkits...")
 toolkits = fetch_toolkits()
-print(f"Found {len(toolkits)} toolkits")
+print(f"Found {len(toolkits)} truly managed toolkits")
+
+managed_auth_lookup = {t["slug"]: t["composio_managed_auth_schemes"] for t in toolkits}
 
 all_tools = []
 for i, toolkit in enumerate(toolkits):
-    print(f"[{i+1}/{len(toolkits)}] {toolkit}...", end=" ")
+    slug = toolkit["slug"]
+    print(f"[{i+1}/{len(toolkits)}] {slug}...", end=" ")
     try:
-        tools = fetch_tools_for_toolkit(toolkit)
+        tools = fetch_tools_for_toolkit(slug)
         all_tools.extend(tools)
         print(f"{len(tools)} tools")
     except Exception as e:
@@ -91,17 +94,22 @@ rag_tools = []
 for tool in all_tools:
     if tool.get("is_deprecated", False):
         continue
-    
+
+    toolkit = tool.get("toolkit", {})
+    toolkit_slug = toolkit.get("slug", "unknown")
+
     rag_tools.append({
         "tool_id": generate(size=12),
         "slug": tool["slug"],
         "name": tool["name"],
         "description": tool.get("description", ""),
-        "toolkit": tool.get("toolkit", {}),
-        "input_parameters": tool.get("input_parameters", {}),
+        "toolkit": toolkit,
+        "tags": tool.get("tags", []),
         "no_auth": tool.get("no_auth", False),
         "version": tool.get("version", ""),
-        "tags": tool.get("tags", [])
+        "scopes": tool.get("scopes", []),
+        "input_parameters": tool.get("input_parameters", {}),
+        "managed_auth_schemes": managed_auth_lookup.get(toolkit_slug, [])
     })
 
 print(f"\nTotal: {len(rag_tools)} tools")
@@ -110,38 +118,40 @@ def build_markdown_and_metadata(tool):
     param_schema = tool['input_parameters'].get('properties', {})
     required_params = tool['input_parameters'].get('required', [])
     toolkit_slug = tool['toolkit'].get('slug', 'unknown')
-    
+
     md = f"# {tool['name']}\n\n## Description\n{tool['description']}\n\n## Parameters\n"
-    
+
     if param_schema:
         for param_name, param_info in param_schema.items():
             param_type = param_info.get('type', 'string')
             param_desc = param_info.get('description', '')
             param_default = param_info.get('default')
             is_required = param_name in required_params
-            
+
             md += f"- `{param_name}` ({param_type}, {'Required' if is_required else 'Optional'}"
             if param_default is not None:
                 md += f", default: {param_default}"
             md += f") - {param_desc}\n"
     else:
         md += "No parameters required\n"
-    
+
     optional_params = [p for p in param_schema.keys() if p not in required_params]
-    
+
     metadata = {
         "metadataAttributes": {
             "toolkit": toolkit_slug,
             "slug": tool['slug'],
             "tool_id": tool['tool_id'],
             "no_auth": str(tool.get('no_auth', False)),
+            "managed_auth_schemes": ",".join(tool.get('managed_auth_schemes', [])),
+            "scopes": ",".join(tool.get('scopes', [])),
             "required_params": ",".join(required_params) if required_params else "",
             "optional_params": ",".join(optional_params) if optional_params else "",
             "tags": ",".join(tool['tags']) if tool['tags'] else "",
             "version": tool['version']
         }
     }
-    
+
     return md, json.dumps(metadata, indent=2)
 
 upload_lock = Lock()
@@ -153,23 +163,23 @@ def upload_tool(tool):
         s3 = boto3.client('s3')
         toolkit_slug = tool['toolkit'].get('slug', 'unknown')
         base_key = f"{toolkit_slug}/{tool['slug']}"
-        
+
         markdown, metadata_json = build_markdown_and_metadata(tool)
-        
+
         s3.put_object(
             Bucket=BUCKET_NAME,
             Key=f"{base_key}.md",
             Body=markdown.encode('utf-8'),
             ContentType='text/markdown'
         )
-        
+
         s3.put_object(
             Bucket=BUCKET_NAME,
             Key=f"{base_key}.md.metadata.json",
             Body=metadata_json.encode('utf-8'),
             ContentType='application/json'
         )
-        
+
         with upload_lock:
             uploaded_count += 1
             if uploaded_count % 100 == 0:
