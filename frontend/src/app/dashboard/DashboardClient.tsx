@@ -433,6 +433,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           currentTaskId={currentTaskId}
           onTaskClick={handleTaskClick}
           onNewTask={handleNewTask}
+          onDeleteTask={(taskId) => console.log("Delete task:", taskId)}
         />
 
         <main className="flex-1 flex flex-col">
