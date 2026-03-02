@@ -11,41 +11,51 @@ class ChatMemory:
         self.bedrock_client = boto3.client('bedrock-agentcore', region_name=region)
     
     def get_chat_name(self, actor_id: str, session_id: str) -> str | None:
-        """Get chat name from first message (Message 0)"""
+        """Get chat name from oldest message (Message 0)"""
         try:
             events_response = self.bedrock_client.list_events(
                 memoryId=self.memory_id,
                 actorId=actor_id,
                 sessionId=session_id,
-                maxResults=1,  # Only need first message
+                maxResults=100,  # Get all events to find oldest
                 includePayloads=True
             )
             
             events = events_response.get('events', [])
-            if events:
-                event = events[0]
-                payload = event.get('payload', [])
-                if payload and isinstance(payload, list):
-                    for item in payload:
-                        if isinstance(item, dict) and 'conversational' in item:
-                            content = item['conversational'].get('content', {})
-                            if isinstance(content, dict):
-                                chat_name = content.get('text', '')
-                                if chat_name:
-                                    logger.info(f"Retrieved chat name (first message) for session {session_id}: {chat_name}")
-                                    return chat_name
+            if not events:
+                logger.info(f"No messages found for session {session_id}")
+                return None
             
-            logger.info(f"No messages found for session {session_id}")
+            # Events are newest-first, so LAST event is Message 0 (oldest)
+            oldest_event = events[-1]
+            
+            payload = oldest_event.get('payload', [])
+            if payload and isinstance(payload, list):
+                for item in payload:
+                    if isinstance(item, dict) and 'conversational' in item:
+                        content = item['conversational'].get('content', {})
+                        if isinstance(content, dict):
+                            chat_name = content.get('text', '')
+                            if chat_name:
+                                logger.info(f"Retrieved chat name (oldest message) for session {session_id}: {chat_name}")
+                                return chat_name
+            
+            logger.info(f"No chat name found for session {session_id}")
             return None
             
         except Exception as e:
             logger.error(f"Failed to retrieve chat name for session {session_id}: {e}")
             return None
     
-    def store_message(self, actor_id: str, session_id: str, message: str, role: str):
-        """Store a message event (no chat_name in metadata)"""
+    def store_message(self, actor_id: str, session_id: str, message: str, role: str, is_chat_name: bool = False):
+        """Store a message event with optional chat_name metadata"""
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc)
+        
+        metadata = {
+            'event_type': {'stringValue': 'chat_name' if is_chat_name else f'{role.lower()}_message'},
+            'source': {'stringValue': 'agent'}
+        }
         
         self.bedrock_client.create_event(
             memoryId=self.memory_id,
@@ -58,12 +68,9 @@ class ChatMemory:
                     'content': {'text': message}
                 }
             }],
-            metadata={
-                'event_type': {'stringValue': f'{role.lower()}_message'},
-                'source': {'stringValue': 'agent'}
-            }
+            metadata=metadata
         )
-        logger.info(f"Stored {role} message for session {session_id}")
+        logger.info(f"Stored {role} message for session {session_id} (chat_name={is_chat_name})")
     
     def is_first_message(self, actor_id: str, session_id: str) -> bool:
         """Check if this is the first message in the session"""

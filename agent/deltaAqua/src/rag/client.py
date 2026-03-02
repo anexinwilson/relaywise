@@ -39,6 +39,7 @@ class MetadataParser:
                 "tool_id": meta.get("tool_id", ""),
                 "toolkit": meta.get("toolkit", ""),
                 "description": meta.get("text", ""),
+                "summary": meta.get("summary", ""),
                 "no_auth": no_auth,
                 "required_params": [p.strip() for p in meta.get("required_params", "").split(",") if p.strip()],
                 "optional_params": [p.strip() for p in meta.get("optional_params", "").split(",") if p.strip()],

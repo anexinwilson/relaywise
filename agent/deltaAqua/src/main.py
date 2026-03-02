@@ -134,14 +134,24 @@ async def ask_agent_handler(payload):
         # Get or generate chat name SYNCHRONOUSLY before returning
         chat_name = None
         try:
-            # Generate chat name from user message
-            chat_name = await agent_service.chat_namer.generate_chat_name(message)
-            if chat_name:
-                chat_name = chat_name.strip('"\' ').strip()
+            # Check if this is the first message in the session
+            is_first = agent_service.chat_memory.is_first_message(user_id, session_id)
+            
+            if is_first:
+                # Generate chat name from user message (only for new conversations)
+                chat_name = await agent_service.chat_namer.generate_chat_name(message)
                 if chat_name:
-                    # Store chat name as FIRST message (Message 0)
-                    agent_service.chat_memory.store_message(user_id, session_id, chat_name, 'ASSISTANT')
-                    logger.info(f"Stored chat name as first message: {chat_name}")
+                    chat_name = chat_name.strip('"\' ').strip()
+                    if chat_name:
+                        # Store chat name with special metadata
+                        agent_service.chat_memory.store_message(user_id, session_id, chat_name, 'ASSISTANT', is_chat_name=True)
+                        logger.info(f"Stored chat name for new session: {chat_name}")
+            
+            # Always retrieve the persisted chat name (for both new and existing sessions)
+            persisted_chat_name = agent_service.chat_memory.get_chat_name(user_id, session_id)
+            if persisted_chat_name:
+                chat_name = persisted_chat_name
+                logger.info(f"Using persisted chat name: {chat_name}")
         except Exception as e:
             logger.error(f"Chat name generation failed: {e}")
 

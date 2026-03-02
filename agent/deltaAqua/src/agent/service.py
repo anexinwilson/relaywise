@@ -68,6 +68,7 @@ class RAGTool(BaseModel):
     toolkit: str
     version: str
     description: str
+    summary: str = ""
     required_params: List[str] = []
     optional_params: List[str] = []
     score: float
@@ -106,6 +107,7 @@ class RAGClient:
                     toolkit=meta.get("toolkit", ""),
                     version=meta.get("version", ""),
                     description=meta.get("text", ""),
+                    summary=meta.get("summary", ""),
                     required_params=req_params.split(",") if req_params else [],
                     optional_params=opt_params.split(",") if opt_params else [],
                     score=match.score
@@ -164,7 +166,10 @@ class AnalysisAgent:
         tools_formatted = []
         for toolkit_name, tools in sorted(tools_by_toolkit.items(), key=lambda x: max(t.score for t in x[1]), reverse=True):
             best_score = max(t.score for t in tools)
-            tools_formatted.append(f"\nToolkit: {toolkit_name} (score: {best_score:.3f})")
+            toolkit_summary = next((t.summary for t in tools if t.summary), "")
+            tools_formatted.append(f"\n\nToolkit: {toolkit_name} (score: {best_score:.3f})")
+            if toolkit_summary:
+                tools_formatted.append(f"Summary: {toolkit_summary[:200]}")
             for t in sorted(tools, key=lambda x: x.score, reverse=True)[:3]:
                 tools_formatted.append(f"  - {t.tool_slug}: {t.description[:80]}")
         

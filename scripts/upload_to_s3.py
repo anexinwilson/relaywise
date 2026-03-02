@@ -5,7 +5,7 @@ import json
 from dotenv import load_dotenv
 import boto3
 from nanoid import generate
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 
 load_dotenv()
@@ -13,12 +13,14 @@ load_dotenv()
 COMPOSIO_API_KEY = os.getenv("COMPOSIO_API_KEY")
 BUCKET_NAME = "cognive-composio-tools"
 
+s3_client = boto3.client('s3')
+
 def fetch_toolkits():
     all_toolkits = []
     cursor = None
     
     while True:
-        params = {"limit": 1000, "managed_by": "composio", "include_deprecated": "false"}
+        params = {"limit": 1000, "include_deprecated": "false"}
         if cursor:
             params["cursor"] = cursor
         
@@ -36,7 +38,7 @@ def fetch_toolkits():
         if not cursor:
             break
     
-    return [t for t in all_toolkits if t.get("composio_managed_auth_schemes")]
+    return all_toolkits
 
 def fetch_tools_for_toolkit(toolkit_slug):
     all_tools = []
@@ -67,49 +69,66 @@ def fetch_tools_for_toolkit(toolkit_slug):
             if not cursor:
                 break
         except Exception as e:
-            print(f"Error fetching {toolkit_slug}: {e}")
+            print(f"Error fetching tools for {toolkit_slug}: {e}")
             break
     
     return all_tools
 
 print("Fetching toolkits...")
-toolkits = fetch_toolkits()
-print(f"Found {len(toolkits)} truly managed toolkits")
+toolkits_data = fetch_toolkits()
+print(f"Found {len(toolkits_data)} toolkits")
 
-managed_auth_lookup = {t["slug"]: t["composio_managed_auth_schemes"] for t in toolkits}
+# Build managed auth lookup
+managed_auth_lookup = {
+    t["slug"]: t["composio_managed_auth_schemes"]
+    for t in toolkits_data
+    if t.get("composio_managed_auth_schemes")
+}
 
+# Build description cache from list response (all apps have meta.description)
+description_cache = {
+    t["slug"]: t.get("meta", {}).get("description", "")
+    for t in toolkits_data
+}
+
+toolkit_slugs = [t["slug"] for t in toolkits_data]
+
+# Fetch all tools in parallel
 all_tools = []
-for i, toolkit in enumerate(toolkits):
-    slug = toolkit["slug"]
-    print(f"[{i+1}/{len(toolkits)}] {slug}...", end=" ")
-    try:
-        tools = fetch_tools_for_toolkit(slug)
-        all_tools.extend(tools)
-        print(f"{len(tools)} tools")
-    except Exception as e:
-        print(f"FAILED: {e}")
-    time.sleep(0.1)
+with ThreadPoolExecutor(max_workers=20) as executor:
+    futures = {executor.submit(fetch_tools_for_toolkit, slug): slug for slug in toolkit_slugs}
+    for i, future in enumerate(as_completed(futures), 1):
+        slug = futures[future]
+        try:
+            tools = future.result()
+            all_tools.extend(tools)
+            print(f"[{i}/{len(toolkit_slugs)}] {slug}: {len(tools)} tools")
+        except Exception as e:
+            print(f"FAILED {slug}: {e}")
 
+# Filter tools
 rag_tools = []
 for tool in all_tools:
     if tool.get("is_deprecated", False):
         continue
 
-    toolkit = tool.get("toolkit", {})
-    toolkit_slug = toolkit.get("slug", "unknown")
+    toolkit_slug = tool.get("toolkit", {}).get("slug", "unknown")
+    is_no_auth = tool.get("no_auth") is True
+    is_managed = toolkit_slug in managed_auth_lookup
 
+    if not is_managed and not is_no_auth:
+        continue
+    
     rag_tools.append({
         "tool_id": generate(size=12),
         "slug": tool["slug"],
         "name": tool["name"],
         "description": tool.get("description", ""),
-        "toolkit": toolkit,
-        "tags": tool.get("tags", []),
+        "toolkit": tool.get("toolkit", {}),
+        "input_parameters": tool.get("input_parameters", {}),
         "no_auth": tool.get("no_auth", False),
         "version": tool.get("version", ""),
-        "scopes": tool.get("scopes", []),
-        "input_parameters": tool.get("input_parameters", {}),
-        "managed_auth_schemes": managed_auth_lookup.get(toolkit_slug, [])
+        "tags": tool.get("tags", [])
     })
 
 print(f"\nTotal: {len(rag_tools)} tools")
@@ -118,40 +137,40 @@ def build_markdown_and_metadata(tool):
     param_schema = tool['input_parameters'].get('properties', {})
     required_params = tool['input_parameters'].get('required', [])
     toolkit_slug = tool['toolkit'].get('slug', 'unknown')
-
+    toolkit_name = tool['toolkit'].get('name', toolkit_slug)
+    
     md = f"# {tool['name']}\n\n## Description\n{tool['description']}\n\n## Parameters\n"
-
+    
     if param_schema:
         for param_name, param_info in param_schema.items():
             param_type = param_info.get('type', 'string')
             param_desc = param_info.get('description', '')
             param_default = param_info.get('default')
             is_required = param_name in required_params
-
+            
             md += f"- `{param_name}` ({param_type}, {'Required' if is_required else 'Optional'}"
             if param_default is not None:
                 md += f", default: {param_default}"
             md += f") - {param_desc}\n"
     else:
         md += "No parameters required\n"
-
+    
     optional_params = [p for p in param_schema.keys() if p not in required_params]
-
+    
     metadata = {
         "metadataAttributes": {
             "toolkit": toolkit_slug,
             "slug": tool['slug'],
             "tool_id": tool['tool_id'],
             "no_auth": str(tool.get('no_auth', False)),
-            "managed_auth_schemes": ",".join(tool.get('managed_auth_schemes', [])),
-            "scopes": ",".join(tool.get('scopes', [])),
             "required_params": ",".join(required_params) if required_params else "",
             "optional_params": ",".join(optional_params) if optional_params else "",
             "tags": ",".join(tool['tags']) if tool['tags'] else "",
-            "version": tool['version']
+            "version": tool['version'],
+            "summary": description_cache.get(toolkit_slug, "")
         }
     }
-
+    
     return md, json.dumps(metadata, indent=2)
 
 upload_lock = Lock()
@@ -160,26 +179,25 @@ uploaded_count = 0
 def upload_tool(tool):
     global uploaded_count
     try:
-        s3 = boto3.client('s3')
         toolkit_slug = tool['toolkit'].get('slug', 'unknown')
         base_key = f"{toolkit_slug}/{tool['slug']}"
-
+        
         markdown, metadata_json = build_markdown_and_metadata(tool)
-
-        s3.put_object(
+        
+        s3_client.put_object(
             Bucket=BUCKET_NAME,
             Key=f"{base_key}.md",
             Body=markdown.encode('utf-8'),
             ContentType='text/markdown'
         )
-
-        s3.put_object(
+        
+        s3_client.put_object(
             Bucket=BUCKET_NAME,
             Key=f"{base_key}.md.metadata.json",
             Body=metadata_json.encode('utf-8'),
             ContentType='application/json'
         )
-
+        
         with upload_lock:
             uploaded_count += 1
             if uploaded_count % 100 == 0:
@@ -187,6 +205,7 @@ def upload_tool(tool):
     except Exception as e:
         print(f"Failed {tool['slug']}: {e}")
 
+print("\nUploading to S3...")
 with ThreadPoolExecutor(max_workers=50) as executor:
     executor.map(upload_tool, rag_tools)
 
