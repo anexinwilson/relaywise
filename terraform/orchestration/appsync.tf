@@ -77,7 +77,7 @@ type UserResponse {
 type Conversation {
   sessionId: String!
   chatName: String
-  createdAt: AWSDateTime
+  lastModifiedAt: String
 }
 
 type Message {

@@ -64,7 +64,7 @@ export interface Task {
   name: string;
   status: "running" | "paused" | "failed" | "completed";
   type: "automation" | "query";
-  createdAt: string;
+  lastModifiedAt: string;
   lastRun: string;
   connectedApps: string[];
   description: string;

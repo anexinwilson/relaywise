@@ -66,7 +66,7 @@ export const GET_USER_CONVERSATIONS = gql`
     getUserConversations {
       sessionId
       chatName
-      createdAt
+      lastModifiedAt
     }
   }
 `;

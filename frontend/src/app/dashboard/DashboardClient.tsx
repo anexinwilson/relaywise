@@ -153,8 +153,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
           name: conv.chatName,
           status: 'paused' as TaskStatus,
           type: 'automation' as const,
-          createdAt: conv.createdAt,
-          lastRun: conv.createdAt,
+          lastModifiedAt: conv.lastModifiedAt,
+          lastRun: conv.lastModifiedAt,
           connectedApps: [],
           description: conv.chatName,
           chatHistory: [],
@@ -213,7 +213,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             name: chatName,
             status: isSuccess ? "completed" as TaskStatus : "failed" as TaskStatus,
             type: "automation" as const,
-            createdAt: new Date().toISOString(),
+            lastModifiedAt: new Date().toISOString(),
             lastRun: timestamp,
             connectedApps: [],
             description: chatName,
@@ -230,6 +230,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             name: chatName || currentTask.name,
             chatHistory: [...currentTask.chatHistory, assistantMessage],
             status: isSuccess ? "completed" : "failed",
+            lastModifiedAt: new Date().toISOString(),
             lastRun: timestamp
           });
         }

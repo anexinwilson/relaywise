@@ -67,7 +67,6 @@ def graphql_resolver(event: dict):
     
     try:
         if field_name == "getOrCreateUser":
-            # This is async because it needs database
             import asyncio
             async def get_user():
                 async for db in get_db():

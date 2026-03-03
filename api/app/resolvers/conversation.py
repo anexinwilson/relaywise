@@ -42,14 +42,15 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
                     created_at = created_at.isoformat()
                 elif created_at is not None:
                     created_at = str(created_at)
-                
-                # Get first message as chat name
-                chat_name = _get_first_message_as_chat_name(userId, session_id)
-                
+
+                # Get chat name and latest event timestamp
+                metadata = _get_session_metadata(userId, session_id)
+                last_modified = metadata['lastModifiedAt'] or created_at
+
                 all_sessions.append({
                     'sessionId': session_id,
-                    'chatName': chat_name,
-                    'createdAt': created_at
+                    'chatName': metadata['chatName'],
+                    'lastModifiedAt': last_modified
                 })
 
             next_token = response.get('nextToken')
@@ -61,8 +62,8 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
         print(f"Error fetching conversations: {e}")
         return []
 
-def _get_first_message_as_chat_name(userId: str, sessionId: str) -> str:
-    """Get Message 0 (oldest message) as chat name"""
+def _get_session_metadata(userId: str, sessionId: str) -> Dict:
+    """Get chat name (oldest event) and lastModifiedAt (newest event timestamp)."""
     try:
         events_response = bedrock_client.list_events(
             memoryId=AGENTCORE_MEMORY_ID,
@@ -71,27 +72,38 @@ def _get_first_message_as_chat_name(userId: str, sessionId: str) -> str:
             maxResults=100,
             includePayloads=True
         )
-        
+
         events = events_response.get('events', [])
         if not events:
-            return None
-        
-        # Events are newest-first, so LAST event is Message 0 (oldest)
+            return {'chatName': None, 'lastModifiedAt': None}
+
+        # Events are newest-first: events[0] is latest, events[-1] is oldest
+        newest_event = events[0]
         oldest_event = events[-1]
-        
+
+        # Get lastModifiedAt from newest event timestamp
+        last_modified = newest_event.get('eventTimestamp')
+        if hasattr(last_modified, 'isoformat'):
+            last_modified = last_modified.isoformat()
+        elif last_modified is not None:
+            last_modified = str(last_modified)
+
+        # Get chat name from oldest event content
+        chat_name = None
         payload = oldest_event.get('payload', [])
         if payload and isinstance(payload, list):
             for item in payload:
                 if isinstance(item, dict) and 'conversational' in item:
                     content = item['conversational'].get('content', {})
                     if isinstance(content, dict):
-                        return content.get('text', '')
-        
-        return None
-        
+                        chat_name = content.get('text', '')
+                        break
+
+        return {'chatName': chat_name, 'lastModifiedAt': last_modified}
+
     except Exception as e:
-        print(f"Error getting chat name for session {sessionId}: {e}")
-        return None
+        print(f"Error getting session metadata for {sessionId}: {e}")
+        return {'chatName': None, 'lastModifiedAt': None}
 
 def get_conversation_messages(obj, info, userId: str, sessionId: str) -> List[Dict]:
     try:

@@ -82,6 +82,13 @@ const initialConversationState: ConversationState = {
   waitingForInput: false,
 };
 
+function sortByLastModified(conversations: Task[]): Task[] {
+  return [...conversations].sort((a, b) => {
+    if (!a.lastModifiedAt || !b.lastModifiedAt) return 0;
+    return new Date(b.lastModifiedAt).getTime() - new Date(a.lastModifiedAt).getTime();
+  });
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -124,10 +131,10 @@ export const useAppStore = create<AppState>()(
 
       // Conversations
       conversations: [],
-      setConversations: (conversations) => set({ conversations }),
+      setConversations: (conversations) => set({ conversations: sortByLastModified(conversations) }),
       addConversation: (conversation) =>
         set((state) => ({
-          conversations: [conversation, ...state.conversations],
+          conversations: sortByLastModified([conversation, ...state.conversations]),
         })),
       removeConversation: (id) =>
         set((state) => ({
@@ -135,9 +142,9 @@ export const useAppStore = create<AppState>()(
         })),
       updateConversation: (id, updates) =>
         set((state) => ({
-          conversations: state.conversations.map((conv) =>
+          conversations: sortByLastModified(state.conversations.map((conv) =>
             conv.id === id ? { ...conv, ...updates } : conv
-          ),
+          )),
         })),
       updateConversationId: (oldId, newId) =>
         set((state) => ({
@@ -219,7 +226,7 @@ export const useCurrentConversation = () => {
         name: 'New Chat',
         status: 'running' as const,
         type: 'automation' as const,
-        createdAt: new Date().toISOString(),
+        lastModifiedAt: new Date().toISOString(),
         lastRun: '',
         connectedApps: [],
         description: 'New Chat',
@@ -247,7 +254,7 @@ export const useCurrentConversation = () => {
       name: 'New Chat',
       status: 'running' as const,
       type: 'automation' as const,
-      createdAt: new Date().toISOString(),
+      lastModifiedAt: new Date().toISOString(),
       lastRun: '',
       connectedApps: [],
       description: 'New Chat',
