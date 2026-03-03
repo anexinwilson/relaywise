@@ -38,6 +38,12 @@ resource "aws_lambda_function" "cognive_lambda" {
   image_uri    = "${aws_ecr_repository.lambda_repo.repository_url}:cognive-lambda"
   package_type = "Image"
 
+  environment {
+    variables = {
+      AGENTCORE_MEMORY_ID = var.agentcore_memory_id
+    }
+  }
+
   logging_config {
     log_group  = aws_cloudwatch_log_group.cognive_lambda_logs.name
     log_format = "JSON"

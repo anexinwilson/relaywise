@@ -21,6 +21,13 @@ type Mutation {
   getOrCreateUser: UserResponse
   publishTaskComplete(input: TaskCompleteInput!): TaskComplete
     @aws_api_key
+  deleteConversation(sessionId: String!): DeleteResponse
+}
+
+type DeleteResponse {
+  success: Boolean!
+  error: String
+  deletedCount: Int
 }
 
 type Subscription {
@@ -239,6 +246,39 @@ resource "aws_appsync_resolver" "get_user_conversations" {
   api_id      = aws_appsync_graphql_api.main.id
   type        = "Query"
   field       = "getUserConversations"
+  data_source = aws_appsync_datasource.lambda.name
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  code = <<EOF
+export function request(ctx) {
+  return {
+    operation: 'Invoke',
+    payload: {
+      info: {
+        fieldName: ctx.info.fieldName
+      },
+      arguments: ctx.arguments,
+      request: {
+        headers: ctx.identity.resolverContext
+      }
+    }
+  };
+}
+export function response(ctx) {
+  if (ctx.error) {
+    return ctx.error;
+  }
+  return ctx.result;
+}
+EOF
+}
+
+resource "aws_appsync_resolver" "delete_conversation" {
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Mutation"
+  field       = "deleteConversation"
   data_source = aws_appsync_datasource.lambda.name
   runtime {
     name            = "APPSYNC_JS"

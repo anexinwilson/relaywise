@@ -90,6 +90,15 @@ def graphql_resolver(event: dict):
                 return []
             result = conversation_resolver.get_conversation_messages(None, None, user_id, session_id)
             return result
+        elif field_name == "deleteConversation":
+            if not user_id:
+                return {"success": False, "error": "Unauthorized"}
+            arguments = event.get("arguments", {})
+            session_id = arguments.get("sessionId")
+            if not session_id:
+                return {"success": False, "error": "sessionId is required"}
+            result = conversation_resolver.delete_conversation(None, None, user_id, session_id)
+            return result
         else:
             return []
     

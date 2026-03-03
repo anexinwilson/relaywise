@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useLazyQuery, useApolloClient } from "@apollo/client/react";
+import { useLazyQuery, useMutation, useApolloClient } from "@apollo/client/react";
 import { useAppStore, useConnectedIntegrations, useConversations, useCurrentConversation, useAddLog, useClearLogs, useLogs } from "@/store/appStore";
-import { ASK_AGENT_QUERY, TASK_COMPLETE_SUBSCRIPTION, GET_USER_CONVERSATIONS, GET_CONVERSATION_MESSAGES } from "@/lib/graphql-queries";
+import { ASK_AGENT_QUERY, TASK_COMPLETE_SUBSCRIPTION, GET_USER_CONVERSATIONS, GET_CONVERSATION_MESSAGES, DELETE_CONVERSATION } from "@/lib/graphql-queries";
 import type { AgentResponse, ChatMessage, Task, TaskComplete } from "@/types";
 import { DashboardHeader } from "@/components/chat/DashboardHeader";
 import { TaskList } from "@/components/chat/TaskList";
@@ -56,6 +56,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     resetConversationState,
     setConversations,
     addConversation,
+    removeConversation,
     updateConversation,
     updateConversationId,
     updateConversationName,
@@ -70,6 +71,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const [currentSubscriptionTaskId, setCurrentSubscriptionTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [deleteConversationMutation] = useMutation<{ deleteConversation: { success: boolean; error?: string; deletedCount?: number } }>(DELETE_CONVERSATION);
   const [askAgent] = useLazyQuery<{ askAgent: AgentResponse }, { message: string; sessionId?: string }>(ASK_AGENT_QUERY);
   const [loadConversations, { data: conversationsData, loading: loadingConversations, error: conversationsError }] = useLazyQuery(GET_USER_CONVERSATIONS, {
     fetchPolicy: 'network-only',
@@ -370,6 +372,39 @@ export function DashboardClient({ user }: DashboardClientProps) {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    // Optimistic: remove from store immediately
+    const wasCurrentTask = currentTaskId === taskId;
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    const deletedTask = tasks[taskIndex];
+    removeConversation(taskId);
+
+    // If deleted task was selected, switch to adjacent or clear
+    if (wasCurrentTask) {
+      const remaining = tasks.filter(t => t.id !== taskId);
+      if (remaining.length > 0) {
+        const nextIndex = Math.min(taskIndex, remaining.length - 1);
+        handleTaskClick(remaining[nextIndex].id);
+      } else {
+        resetConversationState();
+        setCurrentTask(null);
+      }
+    }
+
+    try {
+      const { data } = await deleteConversationMutation({ variables: { sessionId: taskId } });
+      if (!data?.deleteConversation?.success) {
+        // Rollback: re-add the task
+        if (deletedTask) addConversation(deletedTask);
+        setError(`Failed to delete conversation: ${data?.deleteConversation?.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      // Rollback on network error
+      if (deletedTask) addConversation(deletedTask);
+      setError(`Failed to delete conversation: ${err.message || 'Network error'}`);
+    }
+  };
+
   const handleNewTask = () => {
     resetConversationState();
     setCurrentTask(null);
@@ -433,7 +468,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           currentTaskId={currentTaskId}
           onTaskClick={handleTaskClick}
           onNewTask={handleNewTask}
-          onDeleteTask={(taskId) => console.log("Delete task:", taskId)}
+          onDeleteTask={handleDeleteTask}
         />
 
         <main className="flex-1 flex flex-col">

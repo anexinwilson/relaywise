@@ -23,6 +23,7 @@ interface TaskListProps {
 
 export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDeleteTask }: TaskListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,10 +38,21 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
     }
   }, [openMenuId]);
 
-  const handleDelete = (e: React.MouseEvent, taskId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    setConfirmDeleteId(taskId);
+    setOpenMenuId(null);
+  };
+
+  const handleConfirmDelete = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
     if (onDeleteTask) onDeleteTask(taskId);
-    setOpenMenuId(null);
+    setConfirmDeleteId(null);
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDeleteId(null);
   };
 
   const toggleMenu = (e: React.MouseEvent, taskId: string) => {
@@ -92,11 +104,31 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
                 <div className="absolute right-0 top-full mt-1 z-50 w-28 rounded-md border border-gray-700 bg-gray-800 shadow-lg">
                   <div className="p-1">
                     <button
-                      onClick={(e) => handleDelete(e, task.id)}
+                      onClick={(e) => handleDeleteClick(e, task.id)}
                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-500 bg-gray-800 hover:bg-gray-700 rounded cursor-pointer border-none transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {confirmDeleteId === task.id && (
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-gray-700 bg-gray-800 shadow-lg p-3">
+                  <p className="text-xs text-gray-300 mb-2">Delete this conversation?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => handleConfirmDelete(e, task.id)}
+                      className="flex-1 px-2 py-1 text-xs text-white bg-red-600 hover:bg-red-700 rounded cursor-pointer border-none transition-colors"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={handleCancelDelete}
+                      className="flex-1 px-2 py-1 text-xs text-gray-300 bg-gray-700 hover:bg-gray-600 rounded cursor-pointer border-none transition-colors"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>

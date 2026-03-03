@@ -52,6 +52,7 @@ interface AppState {
   conversations: Task[];
   setConversations: (conversations: Task[]) => void;
   addConversation: (conversation: Task) => void;
+  removeConversation: (id: string) => void;
   updateConversation: (id: string, updates: Partial<Task>) => void;
   updateConversationId: (oldId: string, newId: string) => void;
   updateConversationName: (id: string, name: string) => void;
@@ -127,6 +128,10 @@ export const useAppStore = create<AppState>()(
       addConversation: (conversation) =>
         set((state) => ({
           conversations: [conversation, ...state.conversations],
+        })),
+      removeConversation: (id) =>
+        set((state) => ({
+          conversations: state.conversations.filter((conv) => conv.id !== id),
         })),
       updateConversation: (id, updates) =>
         set((state) => ({

@@ -154,8 +154,61 @@ def get_conversation_messages(obj, info, userId: str, sessionId: str) -> List[Di
                 break
         
         messages.sort(key=lambda x: x.get('timestamp', ''))
-        
+
         return messages
     except Exception as e:
         print(f"Error fetching conversation messages for session {sessionId}: {e}")
         return []
+
+
+def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
+    """Delete all events in a conversation session from AgentCore Memory."""
+    try:
+        if not AGENTCORE_MEMORY_ID:
+            return {'success': False, 'error': 'Memory ID not configured'}
+
+        # List all events for this session (paginate to get all)
+        all_event_ids = []
+        next_token = None
+
+        while True:
+            params = {
+                'memoryId': AGENTCORE_MEMORY_ID,
+                'actorId': userId,
+                'sessionId': sessionId,
+                'maxResults': 100,
+            }
+            if next_token:
+                params['nextToken'] = next_token
+
+            response = bedrock_client.list_events(**params)
+
+            for event in response.get('events', []):
+                event_id = event.get('eventId')
+                if event_id:
+                    all_event_ids.append(event_id)
+
+            next_token = response.get('nextToken')
+            if not next_token:
+                break
+
+        # Delete each event individually
+        deleted_count = 0
+        for event_id in all_event_ids:
+            try:
+                bedrock_client.delete_event(
+                    memoryId=AGENTCORE_MEMORY_ID,
+                    sessionId=sessionId,
+                    eventId=event_id,
+                    actorId=userId,
+                )
+                deleted_count += 1
+            except Exception as e:
+                print(f"Error deleting event {event_id}: {e}")
+
+        print(f"Deleted {deleted_count}/{len(all_event_ids)} events for session {sessionId}")
+        return {'success': True, 'deletedCount': deleted_count}
+
+    except Exception as e:
+        print(f"Error deleting conversation {sessionId}: {e}")
+        return {'success': False, 'error': str(e)}

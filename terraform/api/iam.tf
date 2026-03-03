@@ -68,6 +68,7 @@ resource "aws_iam_role_policy" "lambda_agentcore_memory_policy" {
           "bedrock-agentcore:ListSessions",
           "bedrock-agentcore:ListEvents",
           "bedrock-agentcore:CreateEvent",
+          "bedrock-agentcore:DeleteEvent",
           "bedrock-agentcore:GetMemory",
           "bedrock-agentcore:RetrieveMemory"
         ]

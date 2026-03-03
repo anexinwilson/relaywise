@@ -51,6 +51,16 @@ export const GET_OR_CREATE_USER = gql`
   }
 `;
 
+export const DELETE_CONVERSATION = gql`
+  mutation DeleteConversation($sessionId: String!) {
+    deleteConversation(sessionId: $sessionId) {
+      success
+      error
+      deletedCount
+    }
+  }
+`;
+
 export const GET_USER_CONVERSATIONS = gql`
   query GetUserConversations {
     getUserConversations {
