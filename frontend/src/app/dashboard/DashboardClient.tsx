@@ -455,7 +455,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" data-testid="dashboard-page">
+    <div className="h-screen bg-background flex flex-col overflow-hidden" data-testid="dashboard-page">
       <DashboardHeader
         connectedIntegrations={connectedIntegrations}
         onIntegrationsClick={() => router.push("/integrations")}
@@ -463,7 +463,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
         UserButtonComponent={UserButtonComponent}
       />
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0">
         <TaskList
           tasks={tasks}
           currentTaskId={currentTaskId}
@@ -472,7 +472,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           onDeleteTask={handleDeleteTask}
         />
 
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-0">
           {currentTask ? (
             <>
               <TaskHeader
