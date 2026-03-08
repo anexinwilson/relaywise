@@ -1,5 +1,7 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_s3_bucket" "composio_tools" {
-  bucket = "cognive-composio-tools"
+  bucket = "cognive-composio-toolkits"
 }
 
 # Block all public access 

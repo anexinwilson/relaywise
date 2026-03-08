@@ -48,8 +48,8 @@ resource "aws_iam_role_policy" "bedrock_kb_secrets_policy" {
         "secretsmanager:GetSecretValue"
       ]
       Resource = [
-        data.aws_secretsmanager_secret.pinecone_api_key.arn,
-        "arn:aws:secretsmanager:us-east-1:299295684144:secret:pinecone-connection-string-*"
+        aws_secretsmanager_secret.pinecone_api_key.arn,
+        aws_secretsmanager_secret.pinecone_connection_string.arn
       ]
     }]
   })

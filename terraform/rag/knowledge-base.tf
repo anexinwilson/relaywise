@@ -1,12 +1,3 @@
-# Reference existing Pinecone secrets
-data "aws_secretsmanager_secret" "pinecone_api_key" {
-  name = "bedrock-pinecone-key"
-}
-
-data "aws_secretsmanager_secret_version" "pinecone_connection_string" {
-  secret_id = "pinecone-connection-string"
-}
-
 # Bedrock Knowledge Base (using Pinecone)
 resource "aws_bedrockagent_knowledge_base" "composio_tools" {
   name     = "composio-tools-kb"
@@ -22,8 +13,8 @@ resource "aws_bedrockagent_knowledge_base" "composio_tools" {
   storage_configuration {
     type = "PINECONE"
     pinecone_configuration {
-      connection_string      = jsondecode(data.aws_secretsmanager_secret_version.pinecone_connection_string.secret_string)["pinecone-connection-string"]
-      credentials_secret_arn = data.aws_secretsmanager_secret.pinecone_api_key.arn
+      connection_string      = jsondecode(aws_secretsmanager_secret_version.pinecone_connection_string.secret_string)["pinecone-connection-string"]
+      credentials_secret_arn = aws_secretsmanager_secret.pinecone_api_key.arn
       namespace              = ""
       field_mapping {
         metadata_field = "metadata"
