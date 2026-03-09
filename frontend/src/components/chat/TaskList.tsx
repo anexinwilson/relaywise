@@ -7,10 +7,10 @@ import { useState, useRef, useEffect } from "react";
 import type { Task } from "@/types";
 
 const statusIcons: Record<string, string> = {
-  running: "🟢",
-  paused: "⏸️",
-  failed: "🔴",
-  completed: "✅",
+  running: "",
+  paused: "",
+  failed: "",
+  completed: "",
 };
 
 interface TaskListProps {
@@ -21,7 +21,13 @@ interface TaskListProps {
   onDeleteTask?: (taskId: string) => void;
 }
 
-export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDeleteTask }: TaskListProps) {
+export function TaskList({
+  tasks,
+  currentTaskId,
+  onTaskClick,
+  onNewTask,
+  onDeleteTask,
+}: TaskListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -34,7 +40,8 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
     };
     if (openMenuId) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [openMenuId]);
 
@@ -64,7 +71,7 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
     <aside className="w-64 shrink-0 flex flex-col border-r border-border bg-card">
       <div className="p-4 border-b border-border">
         <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-          📋 MY TASKS
+          MY TASKS
         </h2>
       </div>
 
@@ -81,14 +88,16 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
                   "flex items-center gap-2 p-3 rounded-lg transition-colors",
                   currentTaskId === task.id
                     ? "bg-primary/20 text-foreground"
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground",
                 )}
               >
                 <div
                   onClick={() => onTaskClick(task.id)}
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer overflow-hidden"
                 >
-                  <span className="shrink-0">{statusIcons[task.status] || "⚪"}</span>
+                  <span className="shrink-0">
+                    {statusIcons[task.status] || ""}
+                  </span>
                   <span className="truncate text-sm">{task.name}</span>
                 </div>
 
@@ -116,7 +125,9 @@ export function TaskList({ tasks, currentTaskId, onTaskClick, onNewTask, onDelet
 
               {confirmDeleteId === task.id && (
                 <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-gray-700 bg-gray-800 shadow-lg p-3">
-                  <p className="text-xs text-gray-300 mb-2">Delete this conversation?</p>
+                  <p className="text-xs text-gray-300 mb-2">
+                    Delete this conversation?
+                  </p>
                   <div className="flex gap-2">
                     <button
                       onClick={(e) => handleConfirmDelete(e, task.id)}

@@ -70,7 +70,6 @@ export interface Task {
   description: string;
   chatHistory: ChatMessage[];
   compiledWorkflow?: CompiledWorkflow;
-  logs: TaskLog[];
   stats: TaskStats;
 }
 

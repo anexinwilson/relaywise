@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLazyQuery, useMutation, useApolloClient } from "@apollo/client/react";
-import { useAppStore, useConnectedIntegrations, useConversations, useCurrentConversation, useAddLog, useClearLogs, useLogs } from "@/store/appStore";
+import { useAppStore, useConnectedIntegrations, useConversations, useCurrentConversation } from "@/store/appStore";
 import { ASK_AGENT_QUERY, TASK_COMPLETE_SUBSCRIPTION, GET_USER_CONVERSATIONS, GET_CONVERSATION_MESSAGES, DELETE_CONVERSATION } from "@/lib/graphql-queries";
 import type { AgentResponse, ChatMessage, Task, TaskComplete } from "@/types";
 import { DashboardHeader } from "@/components/chat/DashboardHeader";
@@ -11,8 +11,6 @@ import { TaskList } from "@/components/chat/TaskList";
 import { TaskHeader } from "@/components/chat/TaskHeader";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ChatInput } from "@/components/chat/ChatInput";
-import { WorkflowModal } from "@/components/chat/WorkflowModal";
-import { LogsModal } from "@/components/chat/LogsModal";
 
 type TaskStatus = "running" | "paused" | "failed" | "completed";
 
@@ -28,9 +26,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const apolloClient = useApolloClient();
-  const addLog = useAddLog();
-  const clearLogs = useClearLogs();
-  const logs = useLogs();
   
   const [UserButtonComponent, setUserButtonComponent] = useState<React.ComponentType<{ afterSignOutUrl?: string }> | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -49,10 +44,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const {
     currentTaskId,
     setCurrentTask,
-    showCompiledModal,
-    showLogsModal,
-    setShowCompiledModal,
-    setShowLogsModal,
     resetConversationState,
     setConversations,
     addConversation,
@@ -158,8 +149,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           connectedApps: [],
           description: conv.chatName,
           chatHistory: [],
-          compiledWorkflow: { trigger: { type: 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
-          logs: [],
+          compiledWorkflow: { trigger: { type: 'polling' as 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
           stats: { totalRuns: 0 },
         }));
 
@@ -169,7 +159,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
         handleTaskClick(conversationTasks[0].id);
       }
     }
-  }, [conversationsData, currentTaskId, setConversations, handleTaskClick, addLog]);
+  }, [conversationsData, currentTaskId, setConversations, handleTaskClick]);
 
   useEffect(() => {
     const msg = searchParams.get("msg");
@@ -218,8 +208,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             connectedApps: [],
             description: chatName,
             chatHistory: [...pendingMsgs, assistantMessage],
-            compiledWorkflow: { trigger: { type: "polling", interval: "", app: "" }, steps: [], errorHandling: {} },
-            logs: [],
+            compiledWorkflow: { trigger: { type: "polling" as "polling", interval: "", app: "" }, steps: [], errorHandling: {} },
             stats: { totalRuns: 0 },
           };
           addConversation(newTask);
@@ -350,9 +339,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
   };
 
   const handleOptionClick = async (optionValue: string, optionLabel: string) => {
-    if (optionValue === "integrations") { router.push("/integrations"); return; }
-
-    addLog("Option clicked", "info", optionLabel);
     setIsTyping(true);
 
     try {
@@ -477,8 +463,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
             <>
               <TaskHeader
                 task={currentTask}
-                onShowWorkflow={() => setShowCompiledModal(true)}
-                onShowLogs={() => setShowLogsModal(true)}
+                onShowWorkflow={() => {}}
+                onShowLogs={() => {}}
               />
               <ChatArea
                 messages={currentTask.chatHistory}
@@ -501,27 +487,13 @@ export function DashboardClient({ user }: DashboardClientProps) {
             onChange={setChatInput}
             onSubmit={handleSendMessage}
             onIntegrationsClick={() => router.push("/integrations")}
-            onWorkflowClick={() => setShowCompiledModal(true)}
-            onLogsClick={() => setShowLogsModal(true)}
+            onWorkflowClick={() => {}}
+            onLogsClick={() => {}}
             disabled={isTyping}
           />
         </main>
       </div>
 
-      <WorkflowModal
-        open={showCompiledModal}
-        onOpenChange={setShowCompiledModal}
-        task={currentTask}
-        onToggleStatus={handleToggleStatus}
-        onCopyWorkflow={handleCopyWorkflow}
-        copiedWorkflow={copiedWorkflow}
-      />
-
-      <LogsModal
-        open={showLogsModal}
-        onOpenChange={setShowLogsModal}
-        task={currentTask}
-      />
 
       {error && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

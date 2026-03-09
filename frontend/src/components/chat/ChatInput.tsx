@@ -2,7 +2,6 @@ import { useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
-import { QuickActions } from "./QuickActions";
 
 interface ChatInputProps {
   value: string;
@@ -66,12 +65,6 @@ export function ChatInput({
             <Send className="w-4 h-4" />
           </Button>
         </div>
-
-        <QuickActions
-          onIntegrationsClick={onIntegrationsClick}
-          onWorkflowClick={onWorkflowClick}
-          onLogsClick={onLogsClick}
-        />
       </form>
     </div>
   );

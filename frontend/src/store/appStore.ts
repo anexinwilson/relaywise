@@ -3,16 +3,6 @@ import { persist } from "zustand/middleware";
 import type { Integration, Task, ChatMessage } from "@/types";
 import integrationsData from "@/data/integrations.json";
 
-export type LogLevel = "info" | "success" | "error" | "warning";
-
-export interface AppLog {
-  id: string;
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-  details?: string;
-}
-
 // Conversation state for step-by-step chat flows
 interface ConversationState {
   currentTree: string | null;
@@ -22,18 +12,9 @@ interface ConversationState {
 }
 
 interface AppState {
-  // Logs
-  logs: AppLog[];
-  addLog: (message: string, level?: LogLevel, details?: string) => void;
-  clearLogs: () => void;
-
   // UI State
-  showCompiledModal: boolean;
-  showLogsModal: boolean;
   showIntegrationModal: boolean;
   selectedIntegration: Integration | null;
-  setShowCompiledModal: (show: boolean) => void;
-  setShowLogsModal: (show: boolean) => void;
   setShowIntegrationModal: (
     show: boolean,
     integration?: Integration | null
@@ -92,28 +73,9 @@ function sortByLastModified(conversations: Task[]): Task[] {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      // Logs
-      logs: [],
-      addLog: (message, level = "info", details) => {
-        const log: AppLog = {
-          id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date().toISOString(),
-          level,
-          message,
-          details,
-        };
-        set((state) => ({ logs: [log, ...state.logs].slice(0, 500) }));
-        console.log(`[${level.toUpperCase()}] ${message}`, details || "");
-      },
-      clearLogs: () => set({ logs: [] }),
-
       // UI State
-      showCompiledModal: false,
-      showLogsModal: false,
       showIntegrationModal: false,
       selectedIntegration: null,
-      setShowCompiledModal: (show) => set({ showCompiledModal: show }),
-      setShowLogsModal: (show) => set({ showLogsModal: show }),
       setShowIntegrationModal: (show, integration = null) =>
         set({ showIntegrationModal: show, selectedIntegration: integration }),
 
@@ -231,8 +193,7 @@ export const useCurrentConversation = () => {
         connectedApps: [],
         description: 'New Chat',
         chatHistory: pendingMessages,
-        compiledWorkflow: { trigger: { type: 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
-        logs: [],
+        compiledWorkflow: { trigger: { type: 'polling' as const, interval: '', app: '' }, steps: [], errorHandling: {} },
         stats: { totalRuns: 0 },
       };
     }
@@ -260,7 +221,6 @@ export const useCurrentConversation = () => {
       description: 'New Chat',
       chatHistory: pendingMessages,
       compiledWorkflow: { trigger: { type: 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
-      logs: [],
       stats: { totalRuns: 0 },
     };
   }
@@ -273,6 +233,3 @@ export const useConnectedIntegrations = () => {
   return allIntegrations.filter((i) => connectedIds.includes(i.id));
 };
 
-export const useLogs = () => useAppStore((state) => state.logs);
-export const useAddLog = () => useAppStore((state) => state.addLog);
-export const useClearLogs = () => useAppStore((state) => state.clearLogs);
