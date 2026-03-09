@@ -1,4 +1,5 @@
 import json
+import re
 import boto3
 import time
 import asyncio
@@ -14,6 +15,17 @@ import instructor
 
 from .client import get_bedrock_client, get_memory_client, get_pinecone_index, get_composio_client, get_executor
 from rag.client import RAGClient, RAGTool
+from .prompts import (
+    ANALYSIS_SYSTEM_PROMPT, 
+    EXECUTION_SYSTEM_PROMPT, 
+    COGNIVE_INTRO, 
+    COGNIVE_CAPABILITIES_GENERAL,
+    NO_TOOLS_FOUND,
+    TOOLKIT_INIT_FAILED,
+    NO_TOOLS_IN_TOOLKIT,
+    ANALYSIS_FALLBACK_REASONING,
+    GENERIC_ERROR_MESSAGE
+)
 
 from config import settings
 from utils import get_logger
@@ -77,18 +89,7 @@ class AnalysisAgent:
             for t in sorted(tools, key=lambda x: x.score, reverse=True)[:3]:
                 tools_formatted.append(f"  - {t.tool_slug}: {t.description[:80]}")
         
-        system_prompt = """You are an intelligent toolkit and tool selector for an automation platform.
-
-Analyze the user's request and select the ONE best toolkit AND up to 5 specific tool slugs to use.
-
-SELECTION LOGIC:
-- If user explicitly mentions an app name → prioritize that toolkit.
-- Select the specific tool slugs (max 5) that are most likely to solve the request.
-- Only use ONE toolkit.
-- RAG scores help, but user intent is more important.
-
-OUTPUT:
-Return the toolkit, the specific slugs, and a confidence level."""
+        system_prompt = ANALYSIS_SYSTEM_PROMPT
 
         user_prompt = f"""USER REQUEST: "{user_message}"
 
@@ -117,7 +118,7 @@ Choose ONE toolkit that best matches the request."""
                 relevant_toolkit=best_toolkit,
                 selected_slugs=top_slugs,
                 confidence="low",
-                reasoning="Fallback: selected highest RAG score",
+                reasoning=ANALYSIS_FALLBACK_REASONING,
                 intent=user_message
             )
 
@@ -152,16 +153,7 @@ class ExecutionAgent:
             region_name=settings.AWS_REGION
         )
         
-        system_prompt = f"""You are a helpful automation assistant with access to tools.
-USER REQUEST: "{user_message}"
-
-INSTRUCTIONS:
-1. Analyze request and extract specific values (like "#social", names, IDs).
-2. Use tools to find info, then provide a direct answer.
-3. STOP once you have the data.
-
-PARAMETER EXTRACTION:
-- Extract values like channel names or IDs directly from the request above."""
+        system_prompt = EXECUTION_SYSTEM_PROMPT.format(user_message=user_message)
 
         agent = create_react_agent(
             model=self.llm,
@@ -204,6 +196,28 @@ class AgentService:
         )
         logger.info("Initialized 2-agent system with Collapsed Analysis and AgentCore Memory")
 
+    def _classify_intent(self, user_message: str) -> str:
+        system_prompt = "You are an intent classifier. Reply with exactly one word only, no punctuation, no explanation. Your only valid responses are: identity, capabilities, task. identity = user is asking who or what you are. capabilities = user is asking what you can do or help with. task = anything else."
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"Classify this message: {user_message}")
+        ]
+        try:
+            response = self._router_llm.invoke(messages)
+            content = response.content
+            if isinstance(content, list):
+                content = "".join([c.get("text", "") if isinstance(c, dict) else str(c) for c in content])
+            
+            content = str(content).strip().lower()
+            if "identity" in content:
+                return "identity"
+            if "capabilities" in content or "capability" in content:
+                return "general_capabilities"
+            return "task"
+        except Exception as e:
+            logger.error(f"Intent classification failed: {e}")
+            return "task"
+
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str, chat_name: str = None) -> dict:
         start = time.time()
         try:
@@ -211,6 +225,40 @@ class AgentService:
                 chat_name = self.chat_memory.get_chat_name(user_id, conversation_id)
             except Exception as e:
                 logger.error(f"Failed to retrieve chat name from LTM: {e}")
+            
+            # PERSONALITY ROUTING
+            intent = await asyncio.get_event_loop().run_in_executor(
+                _executor, lambda: self._classify_intent(user_message)
+            )
+            logger.info(f"Intent: {intent}")
+
+            if intent == "identity":
+                response = COGNIVE_INTRO
+                self.chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
+                self.chat_memory.store_message(user_id, conversation_id, response, 'ASSISTANT')
+                return {
+                    "response": response, 
+                    "awaiting_user": False, 
+                    "rag_tools_found": 0, 
+                    "rag_tool_names": [], 
+                    "success": True, 
+                    "chatName": chat_name,
+                    "personality_response": True
+                }
+
+            if intent == "general_capabilities":
+                response = COGNIVE_CAPABILITIES_GENERAL
+                self.chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
+                self.chat_memory.store_message(user_id, conversation_id, response, 'ASSISTANT')
+                return {
+                    "response": response, 
+                    "awaiting_user": False, 
+                    "rag_tools_found": 0, 
+                    "rag_tool_names": [], 
+                    "success": True, 
+                    "chatName": chat_name,
+                    "personality_response": True
+                }
             
             # PARALLEL PREP PHASE
             rag_task = self.rag.search_tools(user_message, top_k=3)
@@ -223,7 +271,7 @@ class AgentService:
             
             if not rag_tools:
                 return {
-                    "response": "No tools found.",
+                    "response": NO_TOOLS_FOUND,
                     "awaiting_user": False,
                     "rag_tools_found": 0,
                     "rag_tool_names": [],
@@ -269,7 +317,7 @@ class AgentService:
             except Exception as e:
                 logger.error(f"Composio failed: {e}")
                 return {
-                    "response": f"Failed to initialize {toolkit}. Connect your account.",
+                    "response": TOOLKIT_INIT_FAILED.format(toolkit=toolkit),
                     "awaiting_user": True,
                     "rag_tools_found": len(rag_tools),
                     "rag_tool_names": [t.tool_slug for t in rag_tools],
@@ -279,7 +327,7 @@ class AgentService:
             
             if not tools:
                 return {
-                    "response": f"No tools for {toolkit}. Connect your account.",
+                    "response": NO_TOOLS_IN_TOOLKIT.format(toolkit=toolkit),
                     "awaiting_user": True,
                     "rag_tools_found": len(rag_tools),
                     "rag_tool_names": [t.tool_slug for t in rag_tools],
@@ -306,7 +354,7 @@ class AgentService:
         except Exception as e:
             logger.error(f"Task failed: {e}")
             return {
-                "response": f"Error: {str(e)}",
+                "response": GENERIC_ERROR_MESSAGE.format(error_msg=str(e)),
                 "awaiting_user": False,
                 "rag_tools_found": 0,
                 "rag_tool_names": [],

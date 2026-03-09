@@ -2,7 +2,7 @@ import json
 import asyncio
 from typing import List
 from pydantic import BaseModel
-from ..agent.client import get_bedrock_client, get_pinecone_index, get_executor
+from agent.client import get_bedrock_client, get_pinecone_index, get_executor
 from utils import get_logger
 
 logger = get_logger(__name__)
