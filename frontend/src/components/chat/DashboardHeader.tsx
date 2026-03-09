@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Settings, Plug, User } from "lucide-react";
@@ -17,10 +17,11 @@ export function DashboardHeader({
   onSettingsClick,
   UserButtonComponent,
 }: DashboardHeaderProps) {
+
   return (
     <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
       <Link href="/" className="flex items-center gap-2">
-        <Image
+        <img
           src="/cognive-logo.svg"
           alt="Cognive"
           width={32}
@@ -38,24 +39,22 @@ export function DashboardHeader({
         </span>
         <div className="flex items-center gap-1">
           {connectedIntegrations.slice(0, 5).map((app) => (
-            <Image
+            <img
               key={app.id}
               src={app.logo}
               alt={app.name}
               width={28}
               height={28}
-              className="rounded-lg"
-              unoptimized
+              className="rounded-lg object-contain"
+              loading="lazy"
               onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = `https://ui-avatars.com/api/?name=${app.name}&background=374151&color=fff&size=28`;
+                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(app.name)}&background=1f2937&color=ffffff&size=28&bold=true&format=svg`;
               }}
             />
           ))}
           <Button
-            variant="ghost"
             size="sm"
-            className="h-7 text-primary"
+            className="h-7 gradient-primary text-white hover:opacity-90 transition-opacity"
             onClick={onIntegrationsClick}
           >
             + Add

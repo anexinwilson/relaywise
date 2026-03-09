@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
         hostname: "ui-avatars.com",
         pathname: "/api/**",
       },
+      {
+        protocol: "https",
+        hostname: "logos.composio.dev",
+        pathname: "/api/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ticktick.com",
+        pathname: "/**",
+      },
     ],
   },
   // Fix workspace root detection

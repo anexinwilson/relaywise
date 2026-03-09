@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Integration, Task, ChatMessage } from "@/types";
-import integrationsData from "@/data/integrations.json";
+import appsCatalog from "@/apps_catalog.json";
+
+const formattedIntegrations: Integration[] = (appsCatalog as any[]).map((app) => ({
+  ...app,
+  id: app.slug,
+  supportsRealtime: false,
+}));
 
 // Conversation state for step-by-step chat flows
 interface ConversationState {
@@ -139,7 +145,7 @@ export const useAppStore = create<AppState>()(
         set({ conversationState: initialConversationState }),
 
       // Integrations
-      allIntegrations: integrationsData.popular as Integration[],
+      allIntegrations: formattedIntegrations,
       connectedIntegrationIds: [],
       connectIntegration: (id) =>
         set((state) => ({
