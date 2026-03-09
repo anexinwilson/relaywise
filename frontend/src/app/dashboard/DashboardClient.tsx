@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLazyQuery, useMutation, useApolloClient } from "@apollo/client/react";
 import { useAppStore, useConnectedIntegrations, useConversations, useCurrentConversation } from "@/store/appStore";
-import { ASK_AGENT_QUERY, TASK_COMPLETE_SUBSCRIPTION, GET_USER_CONVERSATIONS, GET_CONVERSATION_MESSAGES, DELETE_CONVERSATION } from "@/lib/graphql-queries";
-import type { AgentResponse, ChatMessage, Task, TaskComplete } from "@/types";
+import { ASK_AGENT_QUERY, TASK_COMPLETE_SUBSCRIPTION, GET_USER_CONVERSATIONS, GET_CONVERSATION_MESSAGES, DELETE_CONVERSATION, ON_AGENT_EVENT } from "@/lib/graphql-queries";
+import type { AgentResponse, ChatMessage, Task, TaskComplete, AgentEvent } from "@/types";
 import { DashboardHeader } from "@/components/chat/DashboardHeader";
 import { TaskList } from "@/components/chat/TaskList";
 import { TaskHeader } from "@/components/chat/TaskHeader";
@@ -65,6 +65,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const [copiedWorkflow, setCopiedWorkflow] = useState(false);
   const [currentSubscriptionTaskId, setCurrentSubscriptionTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [thinkingLogs, setThinkingLogs] = useState<AgentEvent[]>([]);
 
   const [deleteConversationMutation] = useMutation<{ deleteConversation: { success: boolean; error?: string; deletedCount?: number } }>(DELETE_CONVERSATION);
   const [askAgent] = useLazyQuery<{ askAgent: AgentResponse }, { message: string; sessionId?: string }>(ASK_AGENT_QUERY);
@@ -209,6 +210,23 @@ export function DashboardClient({ user }: DashboardClientProps) {
     if (!currentSubscriptionTaskId || !currentTask) return;
 
     console.log('[Subscription] Starting for taskId:', currentSubscriptionTaskId);
+    setThinkingLogs([]);
+
+    const eventSubscription = apolloClient.subscribe<{ onAgentEvent: AgentEvent }>({
+      query: ON_AGENT_EVENT,
+      variables: { taskId: currentTask.id }
+    }).subscribe({
+      next: ({ data }) => {
+        if (data?.onAgentEvent) {
+          setThinkingLogs(prev => [...prev, data.onAgentEvent]);
+          // Scroll to bottom when thinking logs update
+          setTimeout(() => {
+            const dashboard = document.querySelector('[data-testid="dashboard-page"]');
+            if (dashboard) dashboard.scrollTop = dashboard.scrollHeight;
+          }, 50);
+        }
+      }
+    });
 
     const subscription = apolloClient.subscribe<{ onTaskComplete: TaskComplete }>({
       query: TASK_COMPLETE_SUBSCRIPTION,
@@ -284,6 +302,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     return () => {
       console.log('[Subscription] Unsubscribing from taskId:', currentSubscriptionTaskId);
       subscription.unsubscribe();
+      eventSubscription.unsubscribe();
     };
   }, [currentSubscriptionTaskId, currentTask, apolloClient, loadConversations, tasks, addConversation, updateConversation, addMessageToConversation]);
 
@@ -328,6 +347,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     const messageText = chatInput;
     setChatInput("");
     setError(null);
+    setThinkingLogs([]); 
 
     let taskId = currentTask?.id === 'pending' ? null : currentTask?.id;
 
@@ -377,6 +397,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
   const handleOptionClick = async (optionValue: string, optionLabel: string) => {
     setIsTyping(true);
+    setThinkingLogs([]); // Instantly clear logs
 
     try {
       const { response, hasTaskId, sessionId } = await sendMessageToAgent(optionLabel, undefined);
@@ -437,6 +458,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const handleNewTaskWithMessage = async (message: string) => {
     resetConversationState();
     setIsTyping(true);
+    setThinkingLogs([]); // Instantly clear logs
 
     try {
       const { response, hasTaskId, sessionId } = await sendMessageToAgent(message, undefined);
@@ -510,6 +532,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
                 user={user}
                 onOptionClick={handleOptionClick}
                 isLoading={isChatLoading}
+                thinkingLogs={thinkingLogs}
               />
             </>
           ) : (
@@ -519,6 +542,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
               user={user}
               onOptionClick={handleOptionClick}
               isLoading={isChatLoading}
+              thinkingLogs={thinkingLogs}
             />
           )}
 

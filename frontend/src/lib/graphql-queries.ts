@@ -28,6 +28,17 @@ export const TASK_COMPLETE_SUBSCRIPTION = gql`
   }
 `;
 
+export const ON_AGENT_EVENT = gql`
+  subscription OnAgentEvent($taskId: String) {
+    onAgentEvent(taskId: $taskId) {
+      taskId
+      category
+      message
+      timestamp
+    }
+  }
+`;
+
 export const CHAT_NAME_CREATE_SUBSCRIPTION = gql`
   subscription OnChatNameUpdate($sessionId: String) {
     onChatNameUpdate(sessionId: $sessionId) {

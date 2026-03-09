@@ -22,6 +22,8 @@ type Mutation {
   publishTaskComplete(input: TaskCompleteInput!): TaskComplete
     @aws_api_key
   deleteConversation(sessionId: String!): DeleteResponse
+  broadcastAgentEvent(taskId: String!, category: String!, message: String!): AgentEvent
+    @aws_api_key
 }
 
 type DeleteResponse {
@@ -33,6 +35,9 @@ type DeleteResponse {
 type Subscription {
   onTaskComplete(taskId: String): TaskComplete
     @aws_subscribe(mutations: ["publishTaskComplete"])
+    @aws_api_key
+  onAgentEvent(taskId: String): AgentEvent
+    @aws_subscribe(mutations: ["broadcastAgentEvent"])
     @aws_api_key
 }
 
@@ -54,6 +59,13 @@ type TaskComplete @aws_lambda @aws_api_key {
   result: AWSJSON
   error: String
   executionTime: Int
+  timestamp: AWSDateTime!
+}
+
+type AgentEvent @aws_api_key {
+  taskId: String!
+  category: String!
+  message: String!
   timestamp: AWSDateTime!
 }
 
@@ -199,6 +211,32 @@ export function request(ctx) {
       result: ctx.args.input.result,
       error: ctx.args.input.error,
       executionTime: ctx.args.input.executionTime,
+      timestamp: util.time.nowISO8601()
+    }
+  };
+}
+export function response(ctx) {
+  return ctx.result;
+}
+EOF
+}
+
+resource "aws_appsync_resolver" "broadcast_agent_event" {
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Mutation"
+  field       = "broadcastAgentEvent"
+  data_source = aws_appsync_datasource.local.name
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  code = <<-EOF
+export function request(ctx) {
+  return {
+    payload: {
+      taskId: ctx.args.taskId,
+      category: ctx.args.category,
+      message: ctx.args.message,
       timestamp: util.time.nowISO8601()
     }
   };

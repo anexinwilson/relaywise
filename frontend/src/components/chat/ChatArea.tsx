@@ -3,8 +3,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, AgentEvent } from "@/types";
 import { MessageButtons } from "./MessageButtons";
+import { ThinkingBox } from "./ThinkingBox";
 
 interface ChatAreaProps {
   messages: ChatMessage[];
@@ -12,9 +13,10 @@ interface ChatAreaProps {
   user: { firstName?: string | null; imageUrl?: string } | null;
   onOptionClick: (value: string, label: string) => void;
   isLoading?: boolean;
+  thinkingLogs?: AgentEvent[];
 }
 
-export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading }: ChatAreaProps) {
+export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, thinkingLogs = [] }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,27 +45,36 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading }:
           <MessageButtons onOptionClick={onOptionClick} />
         ) : (
           <>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-3",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
+            {messages.map((message, index) => {
+              const isLastMessage = index === messages.length - 1;
+              const isAssistant = message.role === "assistant";
+              return (
+              <div key={message.id} className="flex flex-col gap-4">
+                <div
+                  className={cn(
+                    "flex gap-3",
+                    message.role === "user" ? "justify-end" : "justify-start w-full min-w-0"
+                  )}
+                >
                 {message.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0 shrink-0">
                     <span className="text-white text-sm font-bold">C</span>
                   </div>
                 )}
                 <div
                   className={cn(
-                    "max-w-md rounded-2xl p-4",
+                    "rounded-2xl p-4 flex-1 min-w-0 flex-shrink",
+                    message.role === "assistant" ? "max-w-2xl" : "max-w-md flex-none",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-card border border-border"
                   )}
                 >
+                  {thinkingLogs.length > 0 && !isTyping && isLastMessage && isAssistant && (
+                    <div className="mb-4">
+                      <ThinkingBox logs={thinkingLogs} isComplete={true} />
+                    </div>
+                  )}
                   <p className="text-sm whitespace-pre-line">{message.content}</p>
                   {message.options && message.role === "assistant" && (
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -88,22 +99,29 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading }:
                   </Avatar>
                 )}
               </div>
-            ))}
+            </div>
+            )})}
           </>
         )}
         
         {isTyping && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+          <div className="flex gap-3 justify-start w-full min-w-0">
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shrink-0">
               <span className="text-white text-sm font-bold">C</span>
             </div>
-            <div className="bg-card border border-border rounded-2xl p-4">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.1s]" />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
+            {thinkingLogs.length > 0 ? (
+              <div className="flex-1 min-w-0 max-w-2xl">
+                <ThinkingBox logs={thinkingLogs} isComplete={false} />
               </div>
-            </div>
+            ) : (
+              <div className="bg-card border border-border rounded-2xl p-4 w-fit">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.1s]" />
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
+                </div>
+              </div>
+            )}
           </div>
         )}
         

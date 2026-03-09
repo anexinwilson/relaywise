@@ -144,6 +144,13 @@ export interface TaskComplete {
   timestamp: string;
 }
 
+export interface AgentEvent {
+  taskId: string;
+  category: string;
+  message: string;
+  timestamp: string;
+}
+
 export interface UserResponse {
   userId: string;
   email: string;

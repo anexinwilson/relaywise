@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     AWS_REGION: str = 'us-east-1'
     BEDROCK_MODEL_ID: str
     AGENTCORE_MEMORY_ID: str
+    APPSYNC_EVENTS_ENDPOINT: str
+    APPSYNC_API_KEY: str
 
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 

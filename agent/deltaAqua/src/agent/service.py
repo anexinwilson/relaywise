@@ -31,6 +31,8 @@ from config import settings
 from utils import get_logger
 from memory import ChatMemory
 from agent.chat_namer import ChatNamer
+from agent.event_streaming import stream_event
+from langchain_core.callbacks import AsyncCallbackHandler
 
 logger = get_logger(__name__)
 
@@ -122,6 +124,17 @@ Choose ONE toolkit that best matches the request."""
                 intent=user_message
             )
 
+class BroadcastCallbackHandler(AsyncCallbackHandler):
+    def __init__(self, conversation_id: str):
+        self.conversation_id = conversation_id
+
+    async def on_tool_start(self, serialized: dict, input_str: str, **kwargs: Any) -> Any:
+        tool_name = serialized.get("name", "tool")
+        stream_event(self.conversation_id, "execute", f"Executing action: {tool_name}...")
+    
+    async def on_tool_end(self, output: str, **kwargs: Any) -> Any:
+        stream_event(self.conversation_id, "execute", "Tool execution completed.")
+
 class ExecutionAgent:
     def __init__(self):
         self.llm = ChatBedrockConverse(
@@ -145,7 +158,7 @@ class ExecutionAgent:
             )
         except:
             pass
-    
+
     async def execute(self, user_message: str, tools: List[Any], user_id: str, conversation_id: str) -> str:
         # Modern Agent Factory with Node Caching
         checkpointer = AgentCoreMemorySaver(
@@ -166,7 +179,8 @@ class ExecutionAgent:
             {"messages": [HumanMessage(content=user_message)]},
             config={
                 "configurable": {"thread_id": conversation_id, "actor_id": user_id},
-                "cache": "enabled"
+                "cache": "enabled",
+                "callbacks": [BroadcastCallbackHandler(conversation_id)]
             }
         )
 
@@ -227,6 +241,7 @@ class AgentService:
                 logger.error(f"Failed to retrieve chat name from STM: {e}")
             
             # PERSONALITY ROUTING
+            stream_event(conversation_id, "init", "Classifying conversational intent...")
             intent = await asyncio.get_event_loop().run_in_executor(
                 _executor, lambda: self._classify_intent(user_message)
             )
@@ -261,7 +276,8 @@ class AgentService:
                 }
             
             # PARALLEL PREP PHASE
-            rag_task = self.rag.search_tools(user_message, top_k=3)
+            stream_event(conversation_id, "init", "Searching knowledge base for accessible tools...")
+            rag_task = self.rag.search_tools(user_message, top_k=5)
             pref_task = self.analysis_agent._retrieve_memories(f"/users/{user_id}/preferences", "user preferences")
             context_task = self.analysis_agent._retrieve_memories(f"/semantic/{user_id}", user_message)
 
@@ -282,6 +298,7 @@ class AgentService:
             logger.info(f"RAG: {len(rag_tools)} tools")
             
             # COLLAPSED LLM ANALYSIS (with pre-fetched context)
+            stream_event(conversation_id, "init", f"Identified '{intent}' intent. Selecting optimal tools & strategies...")
             analysis = await self.analysis_agent.analyze(
                 user_message, user_id, rag_tools, 
                 preferences=preferences, 
@@ -293,6 +310,7 @@ class AgentService:
             selected_slugs = analysis.selected_slugs
 
             try:
+                stream_event(conversation_id, "init", f"Connecting to {toolkit.title()} MCP server in Composio...")
                 session = self.composio.create(
                     user_id=user_id,
                     toolkits=[toolkit],
@@ -337,8 +355,10 @@ class AgentService:
             
             logger.info(f"Loaded {len(tools)} tools for {toolkit}")
             
+            stream_event(conversation_id, "execute", f"Loading '{toolkit}' functionality and initializing Execution Agent...")
             final = await self.execution_agent.execute(user_message, tools, user_id, conversation_id)
             
+            stream_event(conversation_id, "completed", "Task completed.")
             logger.info(f"Completed in {time.time() - start:.2f}s")
             
             return {
