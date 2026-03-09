@@ -19,6 +19,7 @@ interface TaskListProps {
   onTaskClick: (taskId: string) => void;
   onNewTask: () => void;
   onDeleteTask?: (taskId: string) => void;
+  isLoading?: boolean;
 }
 
 export function TaskList({
@@ -27,6 +28,7 @@ export function TaskList({
   onTaskClick,
   onNewTask,
   onDeleteTask,
+  isLoading,
 }: TaskListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -77,7 +79,15 @@ export function TaskList({
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-2 space-y-1">
-          {tasks.map((task) => (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={`skeleton-${i}`} className="flex items-center gap-3 p-3 rounded-lg">
+                <div className="w-4 h-4 rounded bg-muted animate-pulse shrink-0" />
+                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+              </div>
+            ))
+          ) : (
+            tasks.map((task) => (
             <div
               key={task.id}
               className="relative"
@@ -145,7 +155,7 @@ export function TaskList({
                 </div>
               )}
             </div>
-          ))}
+          )))}
         </div>
       </div>
 

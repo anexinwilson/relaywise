@@ -54,6 +54,10 @@ export function DashboardClient({ user }: DashboardClientProps) {
     addMessageToConversation,
     addPendingMessage,
     clearPendingMessages,
+    setIsAppLoading,
+    setIsChatLoading,
+    isAppLoading,
+    isChatLoading,
   } = useAppStore();
 
   const [chatInput, setChatInput] = useState("");
@@ -64,10 +68,10 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
   const [deleteConversationMutation] = useMutation<{ deleteConversation: { success: boolean; error?: string; deletedCount?: number } }>(DELETE_CONVERSATION);
   const [askAgent] = useLazyQuery<{ askAgent: AgentResponse }, { message: string; sessionId?: string }>(ASK_AGENT_QUERY);
-  const [loadConversations, { data: conversationsData, loading: loadingConversations, error: conversationsError }] = useLazyQuery(GET_USER_CONVERSATIONS, {
+  const [loadConversations, { data: conversationsData, loading: loadingConversations, error: conversationsError }] = useLazyQuery<{ getUserConversations: any[] }>(GET_USER_CONVERSATIONS, {
     fetchPolicy: 'network-only',
   });
-  const [loadMessages, { error: messagesError }] = useLazyQuery(GET_CONVERSATION_MESSAGES, {
+  const [loadMessages, { error: messagesError }] = useLazyQuery<{ getConversationMessages: any[] }, { sessionId: string }>(GET_CONVERSATION_MESSAGES, {
     fetchPolicy: 'network-only',
   });
 
@@ -83,11 +87,23 @@ export function DashboardClient({ user }: DashboardClientProps) {
   }, [messagesError]);
 
   const handleTaskClick = useCallback(async (taskId: string) => {
+    // 1. Get the current task immediately from Zustand to check its cache
+    const currentTasks = useAppStore.getState().conversations;
+    const cachedTask = currentTasks.find(t => t.id === taskId);
+    const hasCachedHistory = cachedTask && cachedTask.chatHistory && cachedTask.chatHistory.length > 0;
+
     resetConversationState();
     setCurrentTask(taskId);
     
+    // 2. Only show the loading skeleton if this chat is completely empty in Zustand
+    if (!hasCachedHistory) {
+      setIsChatLoading(true);
+    }
+    
+    // 3. Background Sync: Fetch fresh data from AWS no matter what
     const { data, error } = await loadMessages({ variables: { sessionId: taskId } });
     
+    // 4. Update Zustand silently 
     if (data?.getConversationMessages) {
       const actualMessages = data.getConversationMessages.slice(1);
       const messages: ChatMessage[] = actualMessages.map((msg: any) => ({
@@ -98,11 +114,25 @@ export function DashboardClient({ user }: DashboardClientProps) {
       }));
       updateConversation(taskId, { chatHistory: messages });
     }
-  }, [loadMessages, resetConversationState, setCurrentTask, updateConversation]);
+    
+    // 5. Turn off loader
+    if (!hasCachedHistory) {
+      setIsChatLoading(false);
+    }
+  }, [loadMessages, resetConversationState, setCurrentTask, updateConversation, setIsChatLoading]);
 
   useEffect(() => {
-    if (user) loadConversations();
-  }, [user, loadConversations]);
+    if (user) {
+      // If we have no cached conversations, then show the loader.
+      // E.g., first ever login. Otherwise, we cleanly load in the background.
+      if (useAppStore.getState().conversations.length === 0) {
+        setIsAppLoading(true);
+      } else {
+        setIsAppLoading(false);
+      }
+      loadConversations();
+    }
+  }, [user, loadConversations, setIsAppLoading]);
 
   useEffect(() => {
     if (conversationsData?.getUserConversations) {
@@ -115,7 +145,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           for (let i = 0; i < allConversations.length; i++) {
             const conv = allConversations[i];
             try {
-              const { data } = await apolloClient.query({
+              const { data } = await apolloClient.query<{ getConversationMessages: any[] }>({
                 query: GET_CONVERSATION_MESSAGES,
                 variables: { sessionId: conv.sessionId },
                 fetchPolicy: 'network-only'
@@ -137,29 +167,36 @@ export function DashboardClient({ user }: DashboardClientProps) {
         console.groupEnd();
       }
 
+      const currentStoreTasks = useAppStore.getState().conversations;
+
       const conversationTasks: Task[] = allConversations
         .filter((conv: any) => conv.chatName && conv.chatName.trim() !== '')
-        .map((conv: any) => ({
-          id: conv.sessionId,
-          name: conv.chatName,
-          status: 'paused' as TaskStatus,
-          type: 'automation' as const,
-          lastModifiedAt: conv.lastModifiedAt,
-          lastRun: conv.lastModifiedAt,
-          connectedApps: [],
-          description: conv.chatName,
-          chatHistory: [],
-          compiledWorkflow: { trigger: { type: 'polling' as 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
-          stats: { totalRuns: 0 },
-        }));
+        .map((conv: any) => {
+          const existingTask = currentStoreTasks.find(t => t.id === conv.sessionId);
+          return {
+            id: conv.sessionId,
+            name: conv.chatName,
+            status: 'paused' as TaskStatus,
+            type: 'automation' as const,
+            lastModifiedAt: conv.lastModifiedAt,
+            lastRun: conv.lastModifiedAt,
+            connectedApps: [],
+            description: conv.chatName,
+            chatHistory: existingTask?.chatHistory || [], // <-- Preserve from persist!
+            compiledWorkflow: { trigger: { type: 'polling' as 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
+            stats: { totalRuns: 0 },
+          };
+        });
 
       setConversations(conversationTasks);
 
       if (conversationTasks.length > 0 && currentTaskId === undefined) {
         handleTaskClick(conversationTasks[0].id);
       }
+
+      setIsAppLoading(false);
     }
-  }, [conversationsData, currentTaskId, setConversations, handleTaskClick]);
+  }, [conversationsData, currentTaskId, setConversations, handleTaskClick, setIsAppLoading]);
 
   useEffect(() => {
     const msg = searchParams.get("msg");
@@ -185,7 +222,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
         const isSuccess = status === 'COMPLETED';
 
         let parsedResult: any = null;
-        try { parsedResult = result ? JSON.parse(result) : null; } catch (err) {}
+        try { parsedResult = result ? (typeof result === "string" ? JSON.parse(result) : result) : null; } catch (err) {}
 
         const chatName = parsedResult?.chatName || "";
         const assistantMessage: ChatMessage = {
@@ -342,7 +379,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     setIsTyping(true);
 
     try {
-      const { response, hasTaskId, sessionId } = await sendMessageToAgent(optionLabel, null);
+      const { response, hasTaskId, sessionId } = await sendMessageToAgent(optionLabel, undefined);
 
       if (sessionId) {
         setCurrentTask(sessionId);
@@ -402,7 +439,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     setIsTyping(true);
 
     try {
-      const { response, hasTaskId, sessionId } = await sendMessageToAgent(message, null);
+      const { response, hasTaskId, sessionId } = await sendMessageToAgent(message, undefined);
 
       if (sessionId) {
         setCurrentTask(sessionId);
@@ -420,11 +457,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     }
   };
 
-  const handleToggleStatus = () => {
-    if (!currentTask) return;
-    const newStatus: TaskStatus = currentTask.status === "running" ? "paused" : "running";
-    updateConversation(currentTask.id, { status: newStatus });
-  };
+
 
   const handleCopyWorkflow = () => {
     if (currentTask?.compiledWorkflow) {
@@ -439,6 +472,10 @@ export function DashboardClient({ user }: DashboardClientProps) {
       isFirstLoad.current = false;
     }
   }, []);
+
+  if (!mounted) {
+    return null; 
+  }
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden" data-testid="dashboard-page">
@@ -456,6 +493,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           onTaskClick={handleTaskClick}
           onNewTask={handleNewTask}
           onDeleteTask={handleDeleteTask}
+          isLoading={isAppLoading && tasks.length === 0}
         />
 
         <main className="flex-1 flex flex-col min-h-0">
@@ -471,6 +509,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
                 isTyping={isTyping}
                 user={user}
                 onOptionClick={handleOptionClick}
+                isLoading={isChatLoading}
               />
             </>
           ) : (
@@ -479,6 +518,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
               isTyping={isTyping}
               user={user}
               onOptionClick={handleOptionClick}
+              isLoading={isChatLoading}
             />
           )}
 

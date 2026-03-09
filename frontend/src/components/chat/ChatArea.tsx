@@ -1,5 +1,4 @@
 import { useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,9 +11,10 @@ interface ChatAreaProps {
   isTyping: boolean;
   user: { firstName?: string | null; imageUrl?: string } | null;
   onOptionClick: (value: string, label: string) => void;
+  isLoading?: boolean;
 }
 
-export function ChatArea({ messages, isTyping, user, onOptionClick }: ChatAreaProps) {
+export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,16 +24,28 @@ export function ChatArea({ messages, isTyping, user, onOptionClick }: ChatAreaPr
   return (
     <ScrollArea className="flex-1 p-4">
       <div className="max-w-3xl mx-auto space-y-4">
-        {messages.length === 0 && !isTyping ? (
+        {isLoading ? (
+          <div className="space-y-6 animate-pulse">
+             <div className="flex gap-3 justify-end">
+               <div className="max-w-md rounded-2xl p-4 bg-muted w-64 h-16" />
+               <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
+             </div>
+             <div className="flex gap-3 justify-start">
+               <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
+               <div className="max-w-md rounded-2xl p-4 bg-muted w-72 h-24" />
+             </div>
+             <div className="flex gap-3 justify-end">
+               <div className="max-w-md rounded-2xl p-4 bg-muted w-48 h-12" />
+               <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
+             </div>
+          </div>
+        ) : messages.length === 0 && !isTyping ? (
           <MessageButtons onOptionClick={onOptionClick} />
         ) : (
-          <AnimatePresence mode="popLayout">
+          <>
             {messages.map((message) => (
-              <motion.div
+              <div
                 key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
                 className={cn(
                   "flex gap-3",
                   message.role === "user" ? "justify-end" : "justify-start"
@@ -75,17 +87,13 @@ export function ChatArea({ messages, isTyping, user, onOptionClick }: ChatAreaPr
                     <AvatarFallback>{user?.firstName?.charAt(0) || "U"}</AvatarFallback>
                   </Avatar>
                 )}
-              </motion.div>
+              </div>
             ))}
-          </AnimatePresence>
+          </>
         )}
         
         {isTyping && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex gap-3"
-          >
+          <div className="flex gap-3">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <span className="text-white text-sm font-bold">C</span>
             </div>
@@ -96,7 +104,7 @@ export function ChatArea({ messages, isTyping, user, onOptionClick }: ChatAreaPr
                 <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
         
         <div ref={messagesEndRef} />

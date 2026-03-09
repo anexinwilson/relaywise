@@ -224,7 +224,7 @@ class AgentService:
             try:
                 chat_name = self.chat_memory.get_chat_name(user_id, conversation_id)
             except Exception as e:
-                logger.error(f"Failed to retrieve chat name from LTM: {e}")
+                logger.error(f"Failed to retrieve chat name from STM: {e}")
             
             # PERSONALITY ROUTING
             intent = await asyncio.get_event_loop().run_in_executor(

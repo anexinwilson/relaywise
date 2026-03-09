@@ -60,6 +60,12 @@ interface AppState {
   // Onboarding
   hasCompletedOnboarding: boolean;
   setHasCompletedOnboarding: (completed: boolean) => void;
+
+  // Loading States
+  isAppLoading: boolean;
+  setIsAppLoading: (loading: boolean) => void;
+  isChatLoading: boolean;
+  setIsChatLoading: (loading: boolean) => void;
 }
 
 const initialConversationState: ConversationState = {
@@ -165,12 +171,19 @@ export const useAppStore = create<AppState>()(
       hasCompletedOnboarding: false,
       setHasCompletedOnboarding: (completed) =>
         set({ hasCompletedOnboarding: completed }),
+
+      // Loading States
+      isAppLoading: true, // true by default so it shows skeleton immediately on refresh
+      setIsAppLoading: (loading) => set({ isAppLoading: loading }),
+      isChatLoading: false,
+      setIsChatLoading: (loading) => set({ isChatLoading: loading }),
     }),
     {
       name: "cognive-storage",
       partialize: (state) => ({
         connectedIntegrationIds: state.connectedIntegrationIds,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        conversations: state.conversations, // <- Enable localStorage persistence
       }),
     }
   )
@@ -226,7 +239,7 @@ export const useCurrentConversation = () => {
       connectedApps: [],
       description: 'New Chat',
       chatHistory: pendingMessages,
-      compiledWorkflow: { trigger: { type: 'polling', interval: '', app: '' }, steps: [], errorHandling: {} },
+      compiledWorkflow: { trigger: { type: 'polling' as const, interval: '', app: '' }, steps: [], errorHandling: {} },
       stats: { totalRuns: 0 },
     };
   }
