@@ -3,11 +3,12 @@ import re
 import boto3
 import time
 import asyncio
-from typing import List, Any, Literal
+from typing import List, Any, Literal, Optional, Dict
 from pydantic import BaseModel, Field
 from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from composio import Composio
+from composio_langgraph import LanggraphProvider
 
 from langgraph.prebuilt import ToolNode, create_react_agent
 from langgraph_checkpoint_aws import AgentCoreMemorySaver
@@ -83,13 +84,13 @@ class AnalysisAgent:
         
         tools_formatted = []
         for toolkit_name, tools in sorted(tools_by_toolkit.items(), key=lambda x: max(t.score for t in x[1]), reverse=True):
-            best_score = max(t.score for t in tools)
-            toolkit_summary = next((t.summary for t in tools if t.summary), "")
-            tools_formatted.append(f"\n\nToolkit: {toolkit_name} (score: {best_score:.3f})")
-            if toolkit_summary:
-                tools_formatted.append(f"Summary: {toolkit_summary[:200]}")
-            for t in sorted(tools, key=lambda x: x.score, reverse=True)[:3]:
-                tools_formatted.append(f"  - {t.tool_slug}: {t.description[:80]}")
+            tools_formatted.append(f"\n--- TOOLKIT: {toolkit_name.upper()} ---")
+            for t in sorted(tools, key=lambda x: x.score, reverse=True):
+                tools_formatted.append(f"Slug: {t.tool_slug}")
+                tools_formatted.append(f"Description: {t.description}")
+                if t.feature:
+                    tools_formatted.append(f"Feature: {t.feature}")
+                tools_formatted.append("") 
         
         system_prompt = ANALYSIS_SYSTEM_PROMPT
 
@@ -98,7 +99,7 @@ class AnalysisAgent:
 CONTEXT: {user_context}
 
 RAG RESULTS:
-{''.join(tools_formatted)}
+{'\n'.join(tools_formatted)}
 
 Choose ONE toolkit that best matches the request."""
         
@@ -160,7 +161,6 @@ class ExecutionAgent:
             pass
 
     async def execute(self, user_message: str, tools: List[Any], user_id: str, conversation_id: str) -> str:
-        # Modern Agent Factory with Node Caching
         checkpointer = AgentCoreMemorySaver(
             memory_id=settings.AGENTCORE_MEMORY_ID,
             region_name=settings.AWS_REGION
@@ -197,7 +197,7 @@ class ExecutionAgent:
 class AgentService:
     def __init__(self):
         self.rag = RAGClient()
-        self.composio = get_composio_client()
+        self.sdk = Composio(provider=LanggraphProvider())
         self.analysis_agent = AnalysisAgent()
         self.execution_agent = ExecutionAgent()
         self.chat_memory = ChatMemory()
@@ -297,7 +297,7 @@ class AgentService:
             
             logger.info(f"RAG: {len(rag_tools)} tools")
             
-            # COLLAPSED LLM ANALYSIS (with pre-fetched context)
+            # COLLAPSED LLM ANALYSIS 
             stream_event(conversation_id, "init", f"Identified '{intent}' intent. Selecting optimal tools & strategies...")
             analysis = await self.analysis_agent.analyze(
                 user_message, user_id, rag_tools, 
@@ -310,30 +310,50 @@ class AgentService:
             selected_slugs = analysis.selected_slugs
 
             try:
-                stream_event(conversation_id, "init", f"Connecting to {toolkit.title()} MCP server in Composio...")
-                session = self.composio.create(
-                    user_id=user_id,
+                stream_event(conversation_id, "init", f"Initializing Native Tools for {toolkit.title()}...")
+                
+                # 1. Create session - manage_connections=False prevents intercepting output
+                session = self.sdk.create(
+                    user_id=user_id, 
                     toolkits=[toolkit],
                     manage_connections={"callback_url": settings.CALLBACK_URL}
                 )
-                
-                mcp_client = MultiServerMCPClient({
-                    "composio": {
-                        "transport": "streamable_http",
-                        "url": session.mcp.url,
-                        "headers": session.mcp.headers,
-                    }
-                })
-                
-                all_tools = await mcp_client.get_tools()
 
-                # Optimized Context: Exactly the top 5 (or fewer) selected slugs
-                tools = [t for t in all_tools if t.name in selected_slugs]
-                if not tools:
-                    tools = all_tools[:5]
+                # 2. Check connection status BEFORE fetching tools to avoid 400 error
+                toolkits_data = session.toolkits()
+                is_connected = any(
+                    t.slug.lower() == toolkit.lower() and t.connection and t.connection.is_active 
+                    for t in toolkits_data.items
+                )
                 
+                if not is_connected:
+                    stream_event(conversation_id, "init", f"Requesting connection for {toolkit.title()}...")
+                    auth_request = session.authorize(toolkit.lower())
+                    if auth_request and auth_request.redirect_url:
+                        logger.info(f"Account {toolkit} disconnected. Auth URL: {auth_request.redirect_url}")
+                        return {
+                            "response": f"I need to connect your {toolkit.title()} account to proceed. Please authenticate using the link below:\n\n**[Connect {toolkit.title()}]({auth_request.redirect_url})**",
+                            "awaiting_user": True,
+                            "rag_tools_found": len(rag_tools),
+                            "rag_tool_names": [t.tool_slug for t in rag_tools],
+                            "success": False,
+                            "chatName": chat_name,
+                            "connection_url": auth_request.redirect_url
+                        }
+                
+                # 3. Fetch ONLY the exact RAG-selected tool slugs directly as LangChain tools
+                if selected_slugs:
+                    try:
+                        tools = [*self.sdk.tools.get(user_id=user_id, tools=selected_slugs)]
+                        logger.info(f"Loaded {len(tools)} precise tools: {selected_slugs}")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch precise tools {selected_slugs}, falling back to toolkit tools: {e}")
+                        tools = [*self.sdk.tools.get(user_id=user_id, toolkits=[toolkit])][:5]
+                else:
+                    tools = [*self.sdk.tools.get(user_id=user_id, toolkits=[toolkit])][:5]
+
             except Exception as e:
-                logger.error(f"Composio failed: {e}")
+                logger.error(f"Composio Tool retrieval failed: {e}")
                 return {
                     "response": TOOLKIT_INIT_FAILED.format(toolkit=toolkit),
                     "awaiting_user": True,
@@ -356,6 +376,7 @@ class AgentService:
             logger.info(f"Loaded {len(tools)} tools for {toolkit}")
             
             stream_event(conversation_id, "execute", f"Loading '{toolkit}' functionality and initializing Execution Agent...")
+            
             final = await self.execution_agent.execute(user_message, tools, user_id, conversation_id)
             
             stream_event(conversation_id, "completed", "Task completed.")

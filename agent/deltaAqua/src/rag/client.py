@@ -15,6 +15,7 @@ class RAGTool(BaseModel):
     version: str
     description: str
     summary: str = ""
+    feature: str = ""
     required_params: List[str] = []
     optional_params: List[str] = []
     score: float
@@ -55,6 +56,7 @@ class RAGClient:
                 version=meta.get("version", ""),
                 description=meta.get("text", ""),
                 summary=meta.get("summary", ""),
+                feature=meta.get("feature", ""),
                 required_params=req_params.split(",") if req_params else [],
                 optional_params=opt_params.split(",") if opt_params else [],
                 score=match.score

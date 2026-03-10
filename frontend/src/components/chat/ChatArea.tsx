@@ -1,7 +1,6 @@
 import { useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, AgentEvent } from "@/types";
 import { MessageButtons } from "./MessageButtons";
@@ -24,7 +23,7 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, t
   }, [messages]);
 
   return (
-    <ScrollArea className="flex-1 p-4">
+    <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden" id="chat-scroll-container">
       <div className="max-w-3xl mx-auto space-y-4">
         {isLoading ? (
           <div className="space-y-6 animate-pulse">
@@ -127,6 +126,6 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, t
         
         <div ref={messagesEndRef} />
       </div>
-    </ScrollArea>
+    </div>
   );
 }

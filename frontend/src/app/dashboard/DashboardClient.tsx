@@ -207,22 +207,22 @@ export function DashboardClient({ user }: DashboardClientProps) {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!currentSubscriptionTaskId || !currentTask) return;
+    if (!currentSubscriptionTaskId || !currentTaskId) return;
 
     console.log('[Subscription] Starting for taskId:', currentSubscriptionTaskId);
     setThinkingLogs([]);
 
     const eventSubscription = apolloClient.subscribe<{ onAgentEvent: AgentEvent }>({
       query: ON_AGENT_EVENT,
-      variables: { taskId: currentTask.id }
+      variables: { taskId: currentTaskId }
     }).subscribe({
       next: ({ data }) => {
         if (data?.onAgentEvent) {
           setThinkingLogs(prev => [...prev, data.onAgentEvent]);
           // Scroll to bottom when thinking logs update
           setTimeout(() => {
-            const dashboard = document.querySelector('[data-testid="dashboard-page"]');
-            if (dashboard) dashboard.scrollTop = dashboard.scrollHeight;
+            const chatBox = document.getElementById('chat-scroll-container');
+            if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
           }, 50);
         }
       }
@@ -235,6 +235,10 @@ export function DashboardClient({ user }: DashboardClientProps) {
       next: ({ data }) => {
         console.log('[Subscription] Received data:', data);
         if (!data?.onTaskComplete) return;
+
+        const freshState = useAppStore.getState();
+        const freshCurrentTask = freshState.conversations.find(t => t.id === currentTaskId);
+        const freshTasks = freshState.conversations;
 
         const { status, result, error: taskError, timestamp } = data.onTaskComplete;
         const isSuccess = status === 'COMPLETED';
@@ -250,11 +254,11 @@ export function DashboardClient({ user }: DashboardClientProps) {
           timestamp: new Date().toISOString(),
         };
 
-        const existingTask = tasks.find(t => t.id === currentTask.id);
+        const existingTask = freshTasks.find(t => t.id === currentTaskId);
         if (!existingTask && chatName) {
-          const pendingMsgs = useAppStore.getState().pendingMessages;
+          const pendingMsgs = freshState.pendingMessages;
           const newTask: Task = {
-            id: currentTask.id,
+            id: currentTaskId,
             name: chatName,
             status: isSuccess ? "completed" as TaskStatus : "failed" as TaskStatus,
             type: "automation" as const,
@@ -267,12 +271,12 @@ export function DashboardClient({ user }: DashboardClientProps) {
             stats: { totalRuns: 0 },
           };
           addConversation(newTask);
-          clearPendingMessages();
-          setCurrentTask(currentTask.id);
-        } else {
-          updateConversation(currentTask.id, {
-            name: chatName || currentTask.name,
-            chatHistory: [...currentTask.chatHistory, assistantMessage],
+          freshState.clearPendingMessages();
+          setCurrentTask(currentTaskId);
+        } else if (freshCurrentTask) {
+          updateConversation(currentTaskId, {
+            name: chatName || freshCurrentTask.name,
+            chatHistory: [...freshCurrentTask.chatHistory, assistantMessage],
             status: isSuccess ? "completed" : "failed",
             lastModifiedAt: new Date().toISOString(),
             lastRun: timestamp
@@ -290,7 +294,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
           content: `Subscription Error: ${err.message || 'Lost connection to real-time updates'}`,
           timestamp: new Date().toISOString(),
         };
-        addMessageToConversation(currentTask.id, errorMessage);
+        addMessageToConversation(currentTaskId, errorMessage);
         setCurrentSubscriptionTaskId(null);
         setIsTyping(false);
       },
@@ -304,7 +308,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
       subscription.unsubscribe();
       eventSubscription.unsubscribe();
     };
-  }, [currentSubscriptionTaskId, currentTask, apolloClient, loadConversations, tasks, addConversation, updateConversation, addMessageToConversation]);
+  }, [currentSubscriptionTaskId, currentTaskId, apolloClient, addConversation, updateConversation, addMessageToConversation]);
 
   const sendMessageToAgent = async (message: string, sessionId?: string): Promise<{ response: string; hasTaskId: boolean; sessionId?: string }> => {
     try {

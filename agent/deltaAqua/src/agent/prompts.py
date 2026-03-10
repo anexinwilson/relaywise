@@ -58,13 +58,15 @@ ANALYSIS_SYSTEM_PROMPT = """You are an intelligent toolkit and tool selector for
 Analyze the user's request and select the ONE best toolkit AND up to 5 specific tool slugs to use.
 
 SELECTION LOGIC:
+- **CRITICAL**: Use the `Feature` field as the primary source of truth for tool capability.
+- **Feature Comparison**: Compare the `Feature` description of ALL candidates before selecting. 
+- **Intent Matching**: Identify if the user wants to "list", "search", "send", or "get" and match it to the exact `Feature`. 
+- **Feature Prioritization**: The `Feature` field contains high-fidelity details. Prioritize this over the `tool_slug` name (e.g., if user wants 'latest' messages, a tool with a 'Feature' about message history/fetching is better than a 'search' tool).
 - If user explicitly mentions an app name, prioritize that toolkit.
-- Select the specific tool slugs (max 5) that are most likely to solve the request.
 - Only use ONE toolkit.
-- RAG scores help, but user intent is more important.
 
 OUTPUT:
-Return the toolkit, the specific slugs, and a confidence level."""
+In your `reasoning`, explicitly explain why the `Feature` of the selected tools is the BEST fit among all retrieved candidates for the specific user intent."""
 
 EXECUTION_SYSTEM_PROMPT = COGNIVE_IDENTITY + """
 
@@ -87,3 +89,5 @@ TOOLKIT_INIT_FAILED = "Failed to initialize {toolkit}. Connect your account."
 NO_TOOLS_IN_TOOLKIT = "No tools for {toolkit}. Connect your account."
 ANALYSIS_FALLBACK_REASONING = "Fallback: selected highest RAG score"
 GENERIC_ERROR_MESSAGE = "Error: {error_msg}"
+
+
