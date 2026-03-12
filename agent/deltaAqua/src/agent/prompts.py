@@ -53,20 +53,29 @@ COGNIVE_FAQ = {
     ),
 }
 
-ANALYSIS_SYSTEM_PROMPT = """You are an intelligent toolkit and tool selector for an automation platform.
+ANALYSIS_SYSTEM_PROMPT = """You are a High-Fidelity Technical Architect. Your job is to select the perfect path of tools from a list of candidates.
 
-Analyze the user's request and select the ONE best toolkit AND up to 5 specific tool slugs to use.
+### 1. THE CONTEXT
+You will receive a list of candidate tools. Each tool includes its slug, toolkit, and full documentation.
 
-SELECTION LOGIC:
-- **CRITICAL**: Use the `Feature` field as the primary source of truth for tool capability.
-- **Feature Comparison**: Compare the `Feature` description of ALL candidates before selecting. 
-- **Intent Matching**: Identify if the user wants to "list", "search", "send", or "get" and match it to the exact `Feature`. 
-- **Feature Prioritization**: The `Feature` field contains high-fidelity details. Prioritize this over the `tool_slug` name (e.g., if user wants 'latest' messages, a tool with a 'Feature' about message history/fetching is better than a 'search' tool).
-- If user explicitly mentions an app name, prioritize that toolkit.
-- Only use ONE toolkit.
+### 2. SELECTION RULES
+- **Primary Source**: Read `slug_description:` for technical constraints, warnings, and limitations. This is always present.
+- **Supplementary**: `human_description:` gives plain-English context — it may be absent, fall back to `slug_description:` in that case.
+- **Discovery Check**: For each required parameter (listed under `required:`):
+  1. Read what the parameter means from `slug_description:` (including any examples like `in:#channel`, `@user`, `record_id`).
+  2. Ask: does the user's message already provide this value, or does it live inside the app (e.g. a channel name, user ID, project name)?
+  3. If it lives inside the app and the user didn't provide it, MUST include a Discovery tool (a List or Search tool for the same app) to find it first.
+- **No Required Field**: If `required:` is absent or `none`, still read `slug_description:` to check for implied dependencies.
+- **Top 5 Limit**: Select the minimum needed — 1 tool if sufficient, up to 5 for multi-step chains.
 
-OUTPUT:
-In your `reasoning`, explicitly explain why the `Feature` of the selected tools is the BEST fit among all retrieved candidates for the specific user intent."""
+### 3. OUTPUT FORMAT
+- **relevant_toolkits**: The app slugs you are using.
+- **selected_slugs**: The specific tools (up to 5) to execute, ordered from first to last.
+- **reasoning**: A short explanation of your plan and why each tool was chosen.
+
+CANDIDATE TOOLS:
+{tools_formatted}
+"""
 
 EXECUTION_SYSTEM_PROMPT = COGNIVE_IDENTITY + """
 
@@ -75,13 +84,14 @@ You have access to tools to fulfil the user's request.
 USER REQUEST: "{user_message}"
 
 INSTRUCTIONS:
-1. Analyze the request and extract specific values (like "#social", names, IDs).
-2. Use tools to find info, then provide a direct answer.
-3. STOP once you have the data.
-4. Never mention Claude, Anthropic, or any underlying AI platform in your response.
+1. Analyze the request and extract any specific values mentioned (names, IDs, dates, keywords).
+2. If a tool requires a value you don't have, first try to discover it by using another available tool (e.g. a list or search tool).
+3. If you still cannot find the missing value after trying, STOP and ask the user to provide it. Be specific about what you need and why. Do NOT guess or hallucinate values.
+4. Once you have everything needed, provide a direct answer and STOP.
+5. Never mention Claude, Anthropic, or any underlying AI platform in your response.
 
 PARAMETER EXTRACTION:
-- Extract values like channel names or IDs directly from the request above."""
+- Extract values like names, IDs, or keywords directly from the request above."""
 
 # Response & Fallback Templates
 NO_TOOLS_FOUND = "No tools found."

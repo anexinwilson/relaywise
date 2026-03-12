@@ -25,20 +25,20 @@ class RAGClient:
         self.index = get_pinecone_index()
         self.bedrock = get_bedrock_client()
     
-    async def search_tools(self, query: str, top_k: int = 10) -> List[RAGTool]:
+    async def search_tools(self, query: str, top_k: int = 10, filter: dict = None) -> List[RAGTool]:
         try:
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(_executor, self._search_tools_sync, query, top_k)
+            return await loop.run_in_executor(_executor, self._search_tools_sync, query, top_k, filter)
         except Exception as e:
             logger.error(f"RAG search failed: {e}")
             return []
 
-    def _search_tools_sync(self, query: str, top_k: int = 10) -> List[RAGTool]:
+    def _search_tools_sync(self, query: str, top_k: int = 10, filter: dict = None) -> List[RAGTool]:
         embedding = self._get_embedding(query)
         if not embedding:
             return []
         
-        results = self.index.query(vector=embedding, top_k=top_k, include_metadata=True)
+        results = self.index.query(vector=embedding, top_k=top_k, filter=filter, include_metadata=True)
         
         tools = []
         for match in results.matches:
@@ -54,7 +54,7 @@ class RAGClient:
                 tool_id=meta.get("tool_id", ""),
                 toolkit=meta.get("toolkit", ""),
                 version=meta.get("version", ""),
-                description=meta.get("text", ""),
+                description=meta.get("text", meta.get("slug_description", "")),
                 summary=meta.get("summary", ""),
                 feature=meta.get("feature", ""),
                 required_params=req_params.split(",") if req_params else [],
