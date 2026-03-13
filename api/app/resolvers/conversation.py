@@ -5,9 +5,11 @@ from datetime import datetime
 
 try:
     from app.config.settings import settings
+    from app.config.redis import redis_client
     AGENTCORE_MEMORY_ID = os.getenv('AGENTCORE_MEMORY_ID') or getattr(settings, 'AGENTCORE_MEMORY_ID', None)
 except ImportError:
     AGENTCORE_MEMORY_ID = os.getenv('AGENTCORE_MEMORY_ID')
+    redis_client = None
 
 bedrock_client = boto3.client('bedrock-agentcore', region_name='us-east-1')
 
@@ -42,6 +44,12 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
                     created_at = created_at.isoformat()
                 elif created_at is not None:
                     created_at = str(created_at)
+
+                # Skip sessions explicitly marked as deleted
+                if redis_client:
+                    deleted_flag = redis_client.get(f"deleted_conversation:{userId}:{session_id}")
+                    if deleted_flag:
+                        continue
 
                 # Get chat name and latest event timestamp
                 metadata = _get_session_metadata(userId, session_id)
@@ -219,6 +227,14 @@ def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
                 print(f"Error deleting event {event_id}: {e}")
 
         print(f"Deleted {deleted_count}/{len(all_event_ids)} events for session {sessionId}")
+
+        # Soft-delete marker so UI never shows this session again
+        if redis_client:
+            try:
+                redis_client.set(f"deleted_conversation:{userId}:{sessionId}", "1")
+            except Exception as e:
+                print(f"Error setting deleted flag for session {sessionId}: {e}")
+
         return {'success': True, 'deletedCount': deleted_count}
 
     except Exception as e:

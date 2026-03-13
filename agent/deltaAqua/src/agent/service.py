@@ -11,6 +11,8 @@ from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import SystemMessage, HumanMessage
 from composio import Composio
 from composio_langgraph import LanggraphProvider
+from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
+from langfuse import observe
 
 from langgraph.prebuilt import ToolNode, create_react_agent
 from langgraph_checkpoint_aws import AgentCoreMemorySaver
@@ -20,6 +22,7 @@ from .client import get_bedrock_client, get_memory_client, get_pinecone_index, g
 from .sync import sync_connections_to_redis, disconnect_app, check_app_limit
 from rag.client import RAGClient, RAGTool
 from .prompts import (
+    INTENT_SYSTEM_PROMPT,
     ANALYSIS_SYSTEM_PROMPT, 
     EXECUTION_SYSTEM_PROMPT, 
     COGNIVE_INTRO, 
@@ -75,6 +78,7 @@ class AnalysisAgent:
         except:
             return []
     
+    @observe(name="analysis")
     async def analyze(self, user_message: str, user_id: str, rag_tools: List[RAGTool], preferences: List = None, semantic_context: List = None) -> AnalysisOutput:
         if not rag_tools:
             return AnalysisOutput(relevant_toolkits=[], selected_slugs=[], confidence="low", reasoning="No tools found in RAG.", intent=user_message)
@@ -94,7 +98,6 @@ class AnalysisAgent:
             )
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
-            # Fallback: Pick top app and first 3 slugs
             top_toolkit = list(set(t.toolkit for t in rag_tools))[:1]
             top_slugs = [t.tool_slug for t in rag_tools][:3]
             return AnalysisOutput(
@@ -125,21 +128,9 @@ class ExecutionAgent:
             max_tokens=4096,
         )
         self.memory_client = get_memory_client()
+        self.langfuse_handler = LangfuseCallbackHandler()
     
-    async def _create_event(self, actor_id: str, session_id: str, messages: List):
-        try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                _executor,
-                self.memory_client.create_event,
-                settings.AGENTCORE_MEMORY_ID,
-                actor_id,
-                session_id,
-                messages
-            )
-        except:
-            pass
-
+    @observe(name="execution")
     async def execute(self, user_message: str, tools: List[Any], user_id: str, conversation_id: str) -> str:
         checkpointer = AgentCoreMemorySaver(
             memory_id=settings.AGENTCORE_MEMORY_ID,
@@ -160,7 +151,8 @@ class ExecutionAgent:
             config={
                 "configurable": {"thread_id": conversation_id, "actor_id": user_id},
                 "cache": "enabled",
-                "callbacks": [BroadcastCallbackHandler(conversation_id)]
+                "callbacks": [BroadcastCallbackHandler(conversation_id), self.langfuse_handler],
+                "metadata": {"user_id": user_id, "conversation_id": conversation_id},
             }
         )
 
@@ -196,27 +188,9 @@ class AgentService:
             logger.error(f"Failed to load toolkits catalog: {e}")
             self.toolkits_catalog = []
 
-
+    @observe(name="intent_classification")
     def _classify_intent(self, user_message: str) -> IntentOutput:
-        system_prompt = f"""You are a high-performance intent classifier and app router.
-Your job is to:
-1. Classify the user's intent: 'identity' (who you are), 'capabilities' (what you can do), or 'task' (actions/searches).
-2. Extract the best matching toolkit slugs from the CATALOG. Return 1 slug if only one app is clearly meant, or 2 if the user mentions a brand that has both a user-facing app AND a bot variant (e.g., Slack + Slackbot, Discord + Discordbot).
-
-RULES:
-- **Precision First**: If a user names a specific app, return ONLY that app's slug. Do NOT pad with loosely related apps.
-- **Bot Variants Only**: Return 2 slugs ONLY when the brand has a known user+bot pair (e.g., Slack→['slack','slackbot'], Discord→['discord','discordbot']).
-- **Valid Slugs Only**: Return EXACT slugs from the CATALOG.
-
-CATALOG:
-{json.dumps(self.toolkits_catalog)}
-
-EXAMPLES:
-- User: "Fetch discord messages" -> intent="task", toolkits=["discord", "discordbot"]
-- User: "Search my spreadsheet" -> intent="task", toolkits=["googlesheets"]
-- User: "Send a LinkedIn message" -> intent="task", toolkits=["linkedin"]
-- User: "Who are you?" -> intent="identity", toolkits=[]
-"""
+        system_prompt = INTENT_SYSTEM_PROMPT.format(catalog=json.dumps(self.toolkits_catalog))
         try:
             return self._router_llm.chat.completions.create(
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
@@ -226,6 +200,7 @@ EXAMPLES:
             logger.error(f"Intent classification failed: {e}")
             return IntentOutput(intent="task", toolkits=[])
 
+    @observe(name="execute_task")
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str, chat_name: str = None) -> dict:
         start = time.time()
         try:
@@ -234,16 +209,14 @@ EXAMPLES:
             except Exception as e:
                 logger.error(f"Failed to retrieve chat name from STM: {e}")
             
-            # Sync connections to Redis asynchronously
-            asyncio.create_task(sync_connections_to_redis(user_id))
-            
-            # Step 1: Merged Routing & RAG
-            intent_output = self._classify_intent(user_message)
+            # Step 1: Intent classification
+            intent_output = await asyncio.get_event_loop().run_in_executor(
+                _executor, lambda: self._classify_intent(user_message)
+            )
             logger.info(f"Intent: {intent_output.intent} toolkits={intent_output.toolkits}")
 
-            # --- Personality Routing (before RAG to avoid wasted work) ---
+            # Personality routing
             if intent_output.intent == 'identity':
-                # Check for FAQ match first
                 msg_lower = user_message.lower()
                 faq_response = None
                 for key, answer in COGNIVE_FAQ.items():
@@ -276,28 +249,26 @@ EXAMPLES:
                     "personality_response": True
                 }
 
-            # --- Task Routing: RAG + Analysis ---
+            # Step 2: RAG + memory in parallel
             stream_event(conversation_id, "init", "Searching knowledge base for accessible tools...")
 
-            rag_tools = []
             if intent_output.toolkits:
-                rag_tools = await self.rag.search_tools(
+                rag_task = self.rag.search_tools(
                     user_message,
                     top_k=15,
                     filter={"toolkit": {"$in": intent_output.toolkits[:2]}}
                 )
-                logger.info(f"RAG: Found {len(rag_tools)} tools in {intent_output.toolkits[:2]}")
             else:
-                rag_tools = await self.rag.search_tools(user_message, top_k=15)
+                rag_task = self.rag.search_tools(user_message, top_k=15)
 
             pref_task = self.analysis_agent._retrieve_memories(f"/users/{user_id}/preferences", "user preferences")
             context_task = self.analysis_agent._retrieve_memories(f"/semantic/{user_id}", user_message)
 
-            preferences, semantic_context = await asyncio.gather(pref_task, context_task)
+            rag_tools, preferences, semantic_context = await asyncio.gather(rag_task, pref_task, context_task)
 
-            # Map intent for downstream log messages
-            intent_str = intent_output.intent
-            
+            if intent_output.toolkits:
+                logger.info(f"RAG: Found {len(rag_tools)} tools in {intent_output.toolkits[:2]}")
+
             if not rag_tools:
                 return {
                     "response": NO_TOOLS_FOUND,
@@ -310,8 +281,8 @@ EXAMPLES:
             
             logger.info(f"RAG: {len(rag_tools)} tools")
             
-            # COLLAPSED LLM ANALYSIS 
-            stream_event(conversation_id, "init", f"Identified '{intent_str}' intent. Selecting optimal tools & strategies...")
+            # Step 3: Analysis
+            stream_event(conversation_id, "init", f"Selecting optimal tools & strategies...")
             analysis = await self.analysis_agent.analyze(
                 user_message, user_id, rag_tools, 
                 preferences=preferences, 
@@ -322,17 +293,16 @@ EXAMPLES:
             primary_toolkit = analysis.relevant_toolkits[0] if analysis.relevant_toolkits else "unknown"
             selected_slugs = analysis.selected_slugs
 
+            # Step 4: Composio tool loading
             try:
                 stream_event(conversation_id, "init", f"Initializing Native Tools for {primary_toolkit.title()}...")
                 
-                # 1. Create session with all relevant toolkits
                 session = self.sdk.create(
                     user_id=user_id, 
                     toolkits=analysis.relevant_toolkits,
                     manage_connections={"callback_url": settings.CALLBACK_URL}
                 )
 
-                # 2. Check connection status for ALL relevant toolkits
                 toolkits_data = session.toolkits()
                 for tk in analysis.relevant_toolkits:
                     is_connected = any(
@@ -341,7 +311,6 @@ EXAMPLES:
                     )
                     
                     if not is_connected:
-                        # Check 5-app limit before authorizing new connection
                         if check_app_limit(user_id):
                             logger.info(f"User {user_id} hit 5-app limit")
                             return {
@@ -367,13 +336,12 @@ EXAMPLES:
                                 "connection_url": auth_request.redirect_url
                             }
                 
-                # 3. Fetch ONLY the exact RAG-selected tool slugs directly as LangChain tools
                 if selected_slugs:
                     try:
                         tools = [*self.sdk.tools.get(user_id=user_id, tools=selected_slugs)]
                         logger.info(f"Loaded {len(tools)} precise tools: {selected_slugs}")
                     except Exception as e:
-                        logger.error(f"Failed to fetch precise tools {selected_slugs}, falling back to toolkit tools: {e}")
+                        logger.error(f"Failed to fetch precise tools {selected_slugs}, falling back: {e}")
                         tools = [*self.sdk.tools.get(user_id=user_id, toolkits=analysis.relevant_toolkits)][:5]
                 else:
                     tools = [*self.sdk.tools.get(user_id=user_id, toolkits=analysis.relevant_toolkits)][:5]

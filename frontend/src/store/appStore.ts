@@ -105,11 +105,27 @@ export const useAppStore = create<AppState>()(
 
       // Conversations
       conversations: [],
-      setConversations: (conversations) => set({ conversations: sortByLastModified(conversations) }),
+      setConversations: (conversations) =>
+        set(() => {
+          const byId = new Map<string, Task>();
+          conversations.forEach((conv) => {
+            byId.set(conv.id, conv);
+          });
+          return { conversations: sortByLastModified(Array.from(byId.values())) };
+        }),
       addConversation: (conversation) =>
-        set((state) => ({
-          conversations: sortByLastModified([conversation, ...state.conversations]),
-        })),
+        set((state) => {
+          const byId = new Map<string, Task>();
+          // Existing conversations (latest wins)
+          state.conversations.forEach((conv) => {
+            byId.set(conv.id, conv);
+          });
+          // New/updated conversation
+          byId.set(conversation.id, conversation);
+          return {
+            conversations: sortByLastModified(Array.from(byId.values())),
+          };
+        }),
       removeConversation: (id) =>
         set((state) => ({
           conversations: state.conversations.filter((conv) => conv.id !== id),

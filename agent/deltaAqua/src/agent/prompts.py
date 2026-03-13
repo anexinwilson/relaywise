@@ -53,6 +53,26 @@ COGNIVE_FAQ = {
     ),
 }
 
+INTENT_SYSTEM_PROMPT = """You are a high-performance intent classifier and app router.
+Your job is to:
+1. Classify the user's intent: 'identity' (who you are), 'capabilities' (what you can do), or 'task' (actions/searches).
+2. Extract the best matching toolkit slugs from the CATALOG. Return 1 slug if only one app is clearly meant, or 2 if the user mentions a brand that has both a user-facing app AND a bot variant (e.g., Slack + Slackbot, Discord + Discordbot).
+
+RULES:
+- **Precision First**: If a user names a specific app, return ONLY that app's slug. Do NOT pad with loosely related apps.
+- **Bot Variants Only**: Return 2 slugs ONLY when the brand has a known user+bot pair (e.g., Slack->['slack','slackbot'], Discord->['discord','discordbot']).
+- **Valid Slugs Only**: Return EXACT slugs from the CATALOG.
+
+CATALOG:
+{catalog}
+
+EXAMPLES:
+- User: "Fetch discord messages" -> intent="task", toolkits=["discord", "discordbot"]
+- User: "Search my spreadsheet" -> intent="task", toolkits=["googlesheets"]
+- User: "Send a LinkedIn message" -> intent="task", toolkits=["linkedin"]
+- User: "Who are you?" -> intent="identity", toolkits=[]
+"""
+
 ANALYSIS_SYSTEM_PROMPT = """You are a High-Fidelity Technical Architect. Your job is to select the perfect path of tools from a list of candidates.
 
 ### 1. THE CONTEXT
@@ -99,5 +119,3 @@ TOOLKIT_INIT_FAILED = "Failed to initialize {toolkit}. Connect your account."
 NO_TOOLS_IN_TOOLKIT = "No tools for {toolkit}. Connect your account."
 ANALYSIS_FALLBACK_REASONING = "Fallback: selected highest RAG score"
 GENERIC_ERROR_MESSAGE = "Error: {error_msg}"
-
-
