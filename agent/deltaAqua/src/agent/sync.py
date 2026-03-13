@@ -120,3 +120,32 @@ def handle_expired_webhook(event_type: str, data: dict) -> bool:
     except Exception as e:
         logger.error(f"Webhook handler error: {e}")
         return False
+
+
+async def get_auth_url(user_id: str, app_slug: str) -> str | None:
+    """Generate a Composio managed auth URL using the same pattern as the agent."""
+    try:
+        from config import settings
+        sdk = get_composio_client()
+        loop = asyncio.get_event_loop()
+
+        session = await loop.run_in_executor(
+            get_executor(),
+            lambda: sdk.create(
+                user_id=user_id,
+                toolkits=[app_slug],
+                manage_connections={"callback_url": settings.CALLBACK_URL}
+            )
+        )
+
+        auth_request = await loop.run_in_executor(
+            get_executor(),
+            lambda: session.authorize(app_slug)
+        )
+
+        url = getattr(auth_request, "redirect_url", None) or getattr(auth_request, "redirectUrl", None)
+        logger.info(f"Generated auth URL for {app_slug}: {url}")
+        return url
+    except Exception as e:
+        logger.error(f"Failed to generate auth URL for {app_slug}: {e}")
+        return None

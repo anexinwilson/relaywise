@@ -9,7 +9,7 @@ import boto3
 from datetime import datetime
 from bedrock_agentcore import BedrockAgentCoreApp
 from agent import get_agent_service
-from agent.sync import disconnect_app, handle_expired_webhook
+from agent.sync import disconnect_app, handle_expired_webhook, get_auth_url, sync_connections_to_redis
 from agent.client import get_redis_client
 from utils import get_logger
 from dotenv import load_dotenv
@@ -123,6 +123,10 @@ async def handler(payload):
             return await disconnect_app_handler(payload)
         elif action == "webhook":
             return await webhook_handler(payload)
+        elif action == "get_auth_url":
+            return await get_auth_url_handler(payload)
+        elif action == "sync_connections":
+            return await sync_connections_handler(payload)
         else:
             return {"error": f"Unknown action: {action}", "success": False}
     except Exception as e:
@@ -210,6 +214,31 @@ async def webhook_handler(payload):
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return {"success": False, "error": str(e)}
+
+async def get_auth_url_handler(payload):
+    try:
+        user_id = payload.get("userId")
+        app_slug = payload.get("appSlug")
+        if not user_id or not app_slug:
+            return {"error": "Missing userId or appSlug", "success": False}
+        url = await get_auth_url(user_id, app_slug)
+        if url:
+            return {"success": True, "url": url}
+        return {"success": False, "error": "Failed to generate auth URL"}
+    except Exception as e:
+        logger.error(f"get_auth_url error: {e}", exc_info=True)
+        return {"error": str(e), "success": False}
+
+async def sync_connections_handler(payload):
+    try:
+        user_id = payload.get("userId")
+        if not user_id:
+            return {"error": "Missing userId", "success": False}
+        await sync_connections_to_redis(user_id)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"sync_connections error: {e}", exc_info=True)
+        return {"error": str(e), "success": False}
 
 @app.ping
 def health_check():

@@ -18,6 +18,22 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // First, ask AgentCore to sync latest connected apps into Redis
+    try {
+      const agentEndpoint = process.env.AGENT_ENDPOINT || "http://localhost:8080";
+      await fetch(`${agentEndpoint}/invocations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "sync_connections",
+          userId,
+        }),
+      });
+    } catch (err) {
+      console.error("[CONNECTED_APPS] sync_connections failed:", err);
+      // Continue gracefully; we'll just read whatever Redis currently has
+    }
+
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
     const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 

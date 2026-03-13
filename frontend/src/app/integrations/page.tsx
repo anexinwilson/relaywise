@@ -68,10 +68,30 @@ export default function IntegrationsPage() {
     }
 
     setConnectingId(appId);
-    // Simulate connection delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    connectIntegration(appId);
-    setConnectingId(null);
+
+    try {
+      const res = await fetch("/api/integrations/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: appId }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to start connection");
+      }
+
+      const data = await res.json();
+      if (data?.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else {
+        throw new Error("No auth URL returned");
+      }
+    } catch (err) {
+      console.error("Connect Error:", err);
+      alert("Failed to start connection. Please try again.");
+    } finally {
+      setConnectingId(null);
+    }
   };
 
   const handleDisconnect = async (appId: string) => {
@@ -151,7 +171,11 @@ export default function IntegrationsPage() {
             <Plug className="w-8 h-8 text-primary" />
             Integrations
           </h1>
-          <p className="text-muted-foreground">Connect {allApps.length} apps to Cognive</p>
+          <p className="text-muted-foreground">
+            Connect {allApps.length} apps to Cognive. When you click Connect, we&apos;ll open a new
+            tab to complete the app&apos;s authorization, and your connections will appear here
+            once finished.
+          </p>
         </div>
 
         {/* Search */}
@@ -313,7 +337,7 @@ export default function IntegrationsPage() {
                         {isConnecting ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Connecting
+                            Opening
                           </>
                         ) : (
                           "Connect"
