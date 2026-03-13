@@ -35,4 +35,6 @@ dependencies = [
     "langchain-aws>=1.2.5",
     "langchain-core>=1.2.17",
     "composio>=0.11.2",
+    "upstash-redis>=1.0.0",
+    "langfuse>=2.0.0",
 ]

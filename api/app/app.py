@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.database import Base, engine, get_db, User
+from app.config.redis import redis_client
 from app.resolvers import user as user_resolver
 from app.resolvers import conversation as conversation_resolver
 from app.config.settings import settings
@@ -61,6 +62,35 @@ async def clerk_webhook(request: Request):
     return {"success": True}
 
 
+@app.post("/webhooks/composio")
+async def composio_webhook(request: Request):
+    """Handle Composio account lifecycle events (e.g. connection expired)."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    event_type = payload.get("type")
+    data = payload.get("data", {})
+
+    if event_type == "composio.connected_account.expired":
+        account_id = data.get("id")
+        slug = data.get("toolkit", {}).get("slug")
+
+        if account_id and slug:
+            owner_key = f"account_owner:{account_id}"
+            user_id = redis_client.get(owner_key)
+
+            if user_id:
+                if isinstance(user_id, bytes):
+                    user_id = user_id.decode("utf-8")
+                redis_client.hdel(f"connected_apps:{user_id}", slug)
+                redis_client.delete(owner_key)
+                print(f"Composio webhook: cleaned up expired {slug} for user {user_id}")
+
+    return {"success": True}
+
+
 def graphql_resolver(event: dict):
     field_name = event.get("info", {}).get("fieldName")
     user_id = event.get("request", {}).get("headers", {}).get("userId")
@@ -100,6 +130,7 @@ def graphql_resolver(event: dict):
             return result
         else:
             return []
+    
     
     except Exception as e:
         print(f"Error in graphql_resolver: {e}")

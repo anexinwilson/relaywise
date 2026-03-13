@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     AGENTCORE_MEMORY_ID: str
     APPSYNC_EVENTS_ENDPOINT: str
     APPSYNC_API_KEY: str
+    UPSTASH_REDIS_REST_URL: str
+    UPSTASH_REDIS_REST_TOKEN: str
+    LANGFUSE_PUBLIC_KEY: str
+    LANGFUSE_SECRET_KEY: str
+    LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
 
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Settings, Plug, User } from "lucide-react";
@@ -32,29 +31,23 @@ export function DashboardHeader({
       </Link>
       
       {/* Connected Apps */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground hidden md:inline">
           <Plug className="w-4 h-4 inline mr-1" />
           CONNECTED ({connectedIntegrations.length})
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {connectedIntegrations.slice(0, 5).map((app) => (
-            <img
-              key={app.id}
-              src={app.logo}
-              alt={app.name}
-              width={28}
-              height={28}
-              className="rounded-lg object-contain"
-              loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(app.name)}&background=1f2937&color=ffffff&size=28&bold=true&format=svg`;
-              }}
-            />
+            <Link key={app.id} href="/integrations">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border border-border bg-muted/50 text-foreground hover:bg-muted hover:border-primary/40 transition-all cursor-pointer">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                {app.name}
+              </span>
+            </Link>
           ))}
           <Button
             size="sm"
-            className="h-7 gradient-primary text-white hover:opacity-90 transition-opacity"
+            className="h-8 gradient-primary text-white hover:opacity-90 transition-opacity"
             onClick={onIntegrationsClick}
           >
             + Add

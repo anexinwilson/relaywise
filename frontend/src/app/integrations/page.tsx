@@ -25,6 +25,15 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     setMounted(true);
+    // Fetch initial connected state from server
+    fetch("/api/integrations/connected")
+      .then(res => res.json())
+      .then(data => {
+        if (data.slugs && Array.isArray(data.slugs)) {
+          data.slugs.forEach((slug: string) => connectIntegration(slug));
+        }
+      })
+      .catch(err => console.error("Failed to fetch connected apps:", err));
   }, []);
 
   const connectedIntegrations = useConnectedIntegrations();
@@ -52,6 +61,12 @@ export default function IntegrationsPage() {
   const handleConnect = async (appId: string) => {
     if (typeof window === "undefined") return;
 
+    // Check 5-app limit
+    if (connectedApps.length >= 5) {
+      alert("You can connect only upto 5 apps. Please disconnect existing apps.");
+      return;
+    }
+
     setConnectingId(appId);
     // Simulate connection delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -59,8 +74,25 @@ export default function IntegrationsPage() {
     setConnectingId(null);
   };
 
-  const handleDisconnect = (appId: string) => {
-    disconnectIntegration(appId);
+  const handleDisconnect = async (appId: string) => {
+    try {
+      // Optimistic UI update
+      disconnectIntegration(appId);
+      
+      const res = await fetch("/api/integrations/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: appId }),
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to disconnect");
+      }
+    } catch (err) {
+      console.error("Disconnect Error:", err);
+      // Optional: rollback Zustand if failed
+      connectIntegration(appId);
+    }
   };
 
   if (!mounted) {
@@ -141,36 +173,40 @@ export default function IntegrationsPage() {
               <Check className="w-5 h-5 text-success" />
               CONNECTED ({connectedApps.length})
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {connectedApps.map((app) => (
                 <motion.div
                   key={app.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white/5 border border-success/30 rounded-xl p-4 text-center group"
+                  className="bg-white/9 border border-success/30 rounded-xl p-4 flex flex-col justify-between h-full"
                 >
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center p-1">
-                    <img
-                      src={app.logo}
-                      alt={app.name}
-                      className="w-full h-full object-contain"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = getFallbackLogo(app.name);
-                      }}
-                    />
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center p-1">
+                      <img
+                        src={app.logo}
+                        alt={app.name}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = getFallbackLogo(app.name);
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate text-base">{app.name}</h3>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium text-foreground mb-2 truncate px-1">
-                    {app.name}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDisconnect(app.id)}
-                  >
-                    Disconnect
-                  </Button>
+                  <div className="mt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border border-destructive/30"
+                      onClick={() => handleDisconnect(app.id)}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>

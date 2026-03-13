@@ -8,4 +8,5 @@ RUN UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy uv pip install --system -r requireme
 
 COPY . ${LAMBDA_TASK_ROOT}/
 
+
 CMD [ "main.handler" ]

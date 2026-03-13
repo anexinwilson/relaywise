@@ -135,6 +135,22 @@ export function DashboardClient({ user }: DashboardClientProps) {
     }
   }, [user, loadConversations, setIsAppLoading]);
 
+  // Fetch connected apps from Redis via API
+  const connectIntegration = useAppStore((state) => state.connectIntegration);
+  useEffect(() => {
+    if (user && mounted) {
+      fetch("/api/integrations/connected")
+        .then((res) => res.json())
+        .then((data) => {
+          // Use slugs to update Zustand — the store already maps slugs → catalog entries
+          if (data.slugs && Array.isArray(data.slugs)) {
+            data.slugs.forEach((slug: string) => connectIntegration(slug));
+          }
+        })
+        .catch((err) => console.error("Failed to fetch connected apps:", err));
+    }
+  }, [user, mounted, connectIntegration]);
+
   useEffect(() => {
     if (conversationsData?.getUserConversations) {
       const allConversations = conversationsData.getUserConversations;

@@ -1,6 +1,7 @@
 import json
 import re
 import boto3
+import logging
 import time
 import asyncio
 import os
@@ -15,7 +16,8 @@ from langgraph.prebuilt import ToolNode, create_react_agent
 from langgraph_checkpoint_aws import AgentCoreMemorySaver
 import instructor
 
-from .client import get_bedrock_client, get_memory_client, get_pinecone_index, get_composio_client, get_executor
+from .client import get_bedrock_client, get_memory_client, get_pinecone_index, get_composio_client, get_redis_client, get_executor
+from .sync import sync_connections_to_redis, disconnect_app, check_app_limit
 from rag.client import RAGClient, RAGTool
 from .prompts import (
     ANALYSIS_SYSTEM_PROMPT, 
@@ -77,9 +79,6 @@ class AnalysisAgent:
         if not rag_tools:
             return AnalysisOutput(relevant_toolkits=[], selected_slugs=[], confidence="low", reasoning="No tools found in RAG.", intent=user_message)
 
-        # Pass the full flat text blob directly - it already contains slug_description,
-        # human_description (if present), app_description, and required (if present).
-        # The LLM reads it natively - no extraction needed, no missing field errors.
         candidates = []
         for i, tool in enumerate(rag_tools, 1):
             candidates.append(f"### Tool {i} | Slug: {tool.tool_slug} | App: {tool.toolkit}\n{tool.description}")
@@ -172,7 +171,7 @@ class ExecutionAgent:
         chat_memory = ChatMemory()
         chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
         chat_memory.store_message(user_id, conversation_id, final, 'ASSISTANT')
-        
+
         return final
 
 class AgentService:
@@ -197,17 +196,16 @@ class AgentService:
             logger.error(f"Failed to load toolkits catalog: {e}")
             self.toolkits_catalog = []
 
-        logger.info("Initialized 2-agent system with Hierarchical App-Filtered RAG")
 
     def _classify_intent(self, user_message: str) -> IntentOutput:
         system_prompt = f"""You are a high-performance intent classifier and app router.
 Your job is to:
 1. Classify the user's intent: 'identity' (who you are), 'capabilities' (what you can do), or 'task' (actions/searches).
-2. Extract the TOP 2 best matching toolkit slugs from the CATALOG.
+2. Extract the best matching toolkit slugs from the CATALOG. Return 1 slug if only one app is clearly meant, or 2 if the user mentions a brand that has both a user-facing app AND a bot variant (e.g., Slack + Slackbot, Discord + Discordbot).
 
 RULES:
-- **Inclusion > Precision**: If a user mentions a brand, ALWAYS pick the 2 most related toolkits (e.g., Slack -> ['slack', 'slackbot'], Discord -> ['discord', 'discordbot']).
-- **Top 2 Depth**: Always aim for the top 2 if possible to ensure redundant tool search.
+- **Precision First**: If a user names a specific app, return ONLY that app's slug. Do NOT pad with loosely related apps.
+- **Bot Variants Only**: Return 2 slugs ONLY when the brand has a known user+bot pair (e.g., Slack→['slack','slackbot'], Discord→['discord','discordbot']).
 - **Valid Slugs Only**: Return EXACT slugs from the CATALOG.
 
 CATALOG:
@@ -215,7 +213,8 @@ CATALOG:
 
 EXAMPLES:
 - User: "Fetch discord messages" -> intent="task", toolkits=["discord", "discordbot"]
-- User: "Search my spreadsheet" -> intent="task", toolkits=["googlesheets", "excel"]
+- User: "Search my spreadsheet" -> intent="task", toolkits=["googlesheets"]
+- User: "Send a LinkedIn message" -> intent="task", toolkits=["linkedin"]
 - User: "Who are you?" -> intent="identity", toolkits=[]
 """
         try:
@@ -234,6 +233,9 @@ EXAMPLES:
                 chat_name = self.chat_memory.get_chat_name(user_id, conversation_id)
             except Exception as e:
                 logger.error(f"Failed to retrieve chat name from STM: {e}")
+            
+            # Sync connections to Redis asynchronously
+            asyncio.create_task(sync_connections_to_redis(user_id))
             
             # Step 1: Merged Routing & RAG
             intent_output = self._classify_intent(user_message)
@@ -339,6 +341,18 @@ EXAMPLES:
                     )
                     
                     if not is_connected:
+                        # Check 5-app limit before authorizing new connection
+                        if check_app_limit(user_id):
+                            logger.info(f"User {user_id} hit 5-app limit")
+                            return {
+                                "response": "You've reached the limit of 5 connected apps. Please disconnect an app from the [Integrations Page](/integrations) before connecting a new one.",
+                                "awaiting_user": False,
+                                "rag_tools_found": len(rag_tools),
+                                "rag_tool_names": [t.tool_slug for t in rag_tools],
+                                "success": True,
+                                "chatName": chat_name
+                            }
+
                         stream_event(conversation_id, "init", f"Requesting connection for {tk.title()}...")
                         auth_request = session.authorize(tk.lower())
                         if auth_request and auth_request.redirect_url:

@@ -9,6 +9,8 @@ import boto3
 from datetime import datetime
 from bedrock_agentcore import BedrockAgentCoreApp
 from agent import get_agent_service
+from agent.sync import disconnect_app, handle_expired_webhook
+from agent.client import get_redis_client
 from utils import get_logger
 from dotenv import load_dotenv
 
@@ -117,6 +119,10 @@ async def handler(payload):
         logger.info(f"Handler called with action: {action}")
         if action == "ask_agent":
             return await ask_agent_handler(payload)
+        elif action == "disconnect_app":
+            return await disconnect_app_handler(payload)
+        elif action == "webhook":
+            return await webhook_handler(payload)
         else:
             return {"error": f"Unknown action: {action}", "success": False}
     except Exception as e:
@@ -179,6 +185,31 @@ async def ask_agent_handler(payload):
     except Exception as e:
         logger.error(f"ask_agent error: {e}", exc_info=True)
         return {"error": str(e), "success": False}
+
+async def disconnect_app_handler(payload):
+    try:
+        user_id = payload.get("userId")
+        app_slug = payload.get("appSlug")
+        connected_account_id = payload.get("connectedAccountId")
+
+        if not user_id or not app_slug:
+            return {"error": "Missing userId or appSlug", "success": False}
+
+        success = await disconnect_app(user_id, app_slug, connected_account_id)
+        return {"success": success}
+    except Exception as e:
+        logger.error(f"disconnect_app error: {e}", exc_info=True)
+        return {"error": str(e), "success": False}
+
+async def webhook_handler(payload):
+    try:
+        event_type = payload.get("type")
+        data = payload.get("data", {})
+        success = handle_expired_webhook(event_type, data)
+        return {"success": success}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.ping
 def health_check():
