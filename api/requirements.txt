@@ -7,11 +7,8 @@ PyJWT
 cryptography
 requests
 python-dotenv
-sqlalchemy[asyncio]
-asyncpg
 upstash-redis
 clerk-backend-api
 pydantic-settings
-alembic
 svix
 httpx

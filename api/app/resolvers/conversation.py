@@ -45,13 +45,6 @@ def get_user_conversations(obj, info, userId: str) -> List[Dict]:
                 elif created_at is not None:
                     created_at = str(created_at)
 
-                # Skip sessions explicitly marked as deleted
-                if redis_client:
-                    deleted_flag = redis_client.get(f"deleted_conversation:{userId}:{session_id}")
-                    if deleted_flag:
-                        continue
-
-                # Get chat name and latest event timestamp
                 metadata = _get_session_metadata(userId, session_id)
                 last_modified = metadata['lastModifiedAt'] or created_at
 
@@ -212,8 +205,9 @@ def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
             if not next_token:
                 break
 
-        # Delete each event individually
         deleted_count = 0
+        failed_events = []
+        
         for event_id in all_event_ids:
             try:
                 bedrock_client.delete_event(
@@ -225,15 +219,16 @@ def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
                 deleted_count += 1
             except Exception as e:
                 print(f"Error deleting event {event_id}: {e}")
+                failed_events.append(event_id)
+
+        if failed_events:
+            return {
+                'success': False, 
+                'error': f'Failed to delete {len(failed_events)} events',
+                'deletedCount': deleted_count
+            }
 
         print(f"Deleted {deleted_count}/{len(all_event_ids)} events for session {sessionId}")
-
-        # Soft-delete marker so UI never shows this session again
-        if redis_client:
-            try:
-                redis_client.set(f"deleted_conversation:{userId}:{sessionId}", "1")
-            except Exception as e:
-                print(f"Error setting deleted flag for session {sessionId}: {e}")
 
         return {'success': True, 'deletedCount': deleted_count}
 
