@@ -14,3 +14,4 @@ clerk-backend-api
 pydantic-settings
 alembic
 svix
+httpx
