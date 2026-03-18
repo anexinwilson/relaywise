@@ -11,6 +11,7 @@ import { TaskList } from "@/components/chat/TaskList";
 import { TaskHeader } from "@/components/chat/TaskHeader";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { CreditsDisplay } from "@/components/chat/CreditsDisplay";
 
 type TaskStatus = "running" | "paused" | "failed" | "completed";
 
@@ -30,6 +31,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
   const [UserButtonComponent, setUserButtonComponent] = useState<React.ComponentType<{ afterSignOutUrl?: string }> | null>(null);
   const [mounted, setMounted] = useState(false);
   const isFirstLoad = useRef(true);
+  // Track IDs we've just deleted so they don't re-appear via loadConversations
+  const recentlyDeletedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
@@ -58,6 +61,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
     setIsChatLoading,
     isAppLoading,
     isChatLoading,
+    creditsRefreshTrigger,
+    triggerCreditsRefresh,
   } = useAppStore();
 
   const [chatInput, setChatInput] = useState("");
@@ -188,6 +193,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
       const conversationTasks: Task[] = allConversations
         .filter((conv: any) => conv.chatName && conv.chatName.trim() !== '')
+        // Filter out any IDs we recently deleted (Bedrock eventual consistency may return them)
+        .filter((conv: any) => !recentlyDeletedIds.current.has(conv.sessionId))
         .map((conv: any) => {
           const existingTask = currentStoreTasks.find(t => t.id === conv.sessionId);
           return {
@@ -301,6 +308,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
         setCurrentSubscriptionTaskId(null);
         setIsTyping(false);
+        triggerCreditsRefresh(); // Refresh credits after agent execution completes
       },
       error: (err) => {
         console.error("[Subscription] Error:", err);
@@ -328,6 +336,17 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
   const sendMessageToAgent = async (message: string, sessionId?: string): Promise<{ response: string; hasTaskId: boolean; sessionId?: string }> => {
     try {
+      fetch("/api/integrations/connected")
+        .then(res => res.json())
+        .then(data => {
+          if (data.slugs && Array.isArray(data.slugs)) {
+            const currentIds = useAppStore.getState().connectedIntegrationIds;
+            const newIds = data.slugs.filter((slug: string) => !currentIds.includes(slug));
+            newIds.forEach((slug: string) => connectIntegration(slug));
+          }
+        })
+        .catch(() => {});
+
       const { data, error } = await askAgent({ variables: { message, sessionId } });
       const result = data?.askAgent;
 
@@ -438,13 +457,14 @@ export function DashboardClient({ user }: DashboardClientProps) {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    // Optimistic: remove from store immediately
     const wasCurrentTask = currentTaskId === taskId;
     const taskIndex = tasks.findIndex(t => t.id === taskId);
     const deletedTask = tasks[taskIndex];
+
+    // Mark as deleted immediately so loadConversations refetches don't re-add it
+    recentlyDeletedIds.current.add(taskId);
     removeConversation(taskId);
 
-    // If deleted task was selected, switch to adjacent or clear
     if (wasCurrentTask) {
       const remaining = tasks.filter(t => t.id !== taskId);
       if (remaining.length > 0) {
@@ -459,12 +479,16 @@ export function DashboardClient({ user }: DashboardClientProps) {
     try {
       const { data } = await deleteConversationMutation({ variables: { sessionId: taskId } });
       if (!data?.deleteConversation?.success) {
-        // Rollback: re-add the task
+        // Only roll back if truly failed (not a partial success treated as success by backend)
+        recentlyDeletedIds.current.delete(taskId);
         if (deletedTask) addConversation(deletedTask);
         setError(`Failed to delete conversation: ${data?.deleteConversation?.error || 'Unknown error'}`);
       }
+      // On success: Zustand already has the correct state (item removed).
+      // Do NOT call loadConversations() here — Bedrock eventual consistency
+      // may still return the deleted session, causing it to re-appear.
     } catch (err: any) {
-      // Rollback on network error
+      recentlyDeletedIds.current.delete(taskId);
       if (deletedTask) addConversation(deletedTask);
       setError(`Failed to delete conversation: ${err.message || 'Network error'}`);
     }
@@ -536,7 +560,11 @@ export function DashboardClient({ user }: DashboardClientProps) {
           onNewTask={handleNewTask}
           onDeleteTask={handleDeleteTask}
           isLoading={isAppLoading && tasks.length === 0}
-        />
+          creditsUsed={0}
+          creditsTotal={100}
+        >
+          <CreditsDisplay refreshTrigger={creditsRefreshTrigger} />
+        </TaskList>
 
         <main className="flex-1 flex flex-col min-h-0">
           {currentTask ? (

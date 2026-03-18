@@ -66,6 +66,10 @@ interface AppState {
   setIsAppLoading: (loading: boolean) => void;
   isChatLoading: boolean;
   setIsChatLoading: (loading: boolean) => void;
+
+  // Credits
+  creditsRefreshTrigger: number;
+  triggerCreditsRefresh: () => void;
 }
 
 const initialConversationState: ConversationState = {
@@ -193,6 +197,11 @@ export const useAppStore = create<AppState>()(
       setIsAppLoading: (loading) => set({ isAppLoading: loading }),
       isChatLoading: false,
       setIsChatLoading: (loading) => set({ isChatLoading: loading }),
+
+      // Credits
+      creditsRefreshTrigger: 0,
+      triggerCreditsRefresh: () =>
+        set((state) => ({ creditsRefreshTrigger: state.creditsRefreshTrigger + 1 })),
     }),
     {
       name: "cognive-storage",

@@ -1,4 +1,5 @@
 import json
+import re
 import asyncio
 from typing import List
 from pydantic import BaseModel
@@ -14,10 +15,7 @@ class RAGTool(BaseModel):
     toolkit: str
     version: str
     description: str
-    summary: str = ""
-    feature: str = ""
     required_params: List[str] = []
-    optional_params: List[str] = []
     score: float
 
 class RAGClient:
@@ -46,21 +44,32 @@ class RAGClient:
             if isinstance(meta, str):
                 meta = json.loads(meta)
             
-            req_params = meta.get("required_params", "")
-            opt_params = meta.get("optional_params", "")
+            tool_slug = meta.get("slug", "")
+            toolkit = meta.get("toolkit", "")
+            version = meta.get("version", "")
             
-            tools.append(RAGTool(
-                tool_slug=meta.get("slug", ""),
-                tool_id=meta.get("tool_id", ""),
-                toolkit=meta.get("toolkit", ""),
-                version=meta.get("version", ""),
-                description=meta.get("text", meta.get("slug_description", "")),
-                summary=meta.get("summary", ""),
-                feature=meta.get("feature", ""),
-                required_params=req_params.split(",") if req_params else [],
-                optional_params=opt_params.split(",") if opt_params else [],
-                score=match.score
-            ))
+            # full prose chunk — contains slug_description, human_description, required
+            chunk_text = meta.get("text", "")
+            
+            # parse required params from chunk text
+            required_params = []
+            if chunk_text:
+                req_match = re.search(r'required:\s*(.+?)(?:\n|$)', chunk_text, re.IGNORECASE)
+                if req_match:
+                    val = req_match.group(1).strip()
+                    if val.lower() != "none":
+                        required_params = [v.strip() for v in val.split(",")]
+            
+            if tool_slug:
+                tools.append(RAGTool(
+                    tool_slug=tool_slug,
+                    tool_id=tool_slug,
+                    toolkit=toolkit,
+                    version=version,
+                    description=chunk_text,
+                    required_params=required_params,
+                    score=match.score
+                ))
         return tools
     
     def _get_embedding(self, text: str) -> List[float]:

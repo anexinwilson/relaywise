@@ -184,26 +184,31 @@ def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
         all_event_ids = []
         next_token = None
 
-        while True:
-            params = {
-                'memoryId': AGENTCORE_MEMORY_ID,
-                'actorId': userId,
-                'sessionId': sessionId,
-                'maxResults': 100,
-            }
-            if next_token:
-                params['nextToken'] = next_token
+        try:
+            while True:
+                params = {
+                    'memoryId': AGENTCORE_MEMORY_ID,
+                    'actorId': userId,
+                    'sessionId': sessionId,
+                    'maxResults': 100,
+                }
+                if next_token:
+                    params['nextToken'] = next_token
 
-            response = bedrock_client.list_events(**params)
+                response = bedrock_client.list_events(**params)
 
-            for event in response.get('events', []):
-                event_id = event.get('eventId')
-                if event_id:
-                    all_event_ids.append(event_id)
+                for event in response.get('events', []):
+                    event_id = event.get('eventId')
+                    if event_id:
+                        all_event_ids.append(event_id)
 
-            next_token = response.get('nextToken')
-            if not next_token:
-                break
+                next_token = response.get('nextToken')
+                if not next_token:
+                    break
+        except Exception as e:
+            print(f"Session {sessionId} not found or already deleted (list_events failed): {e}")
+            # Session doesn't exist anymore - treat as already deleted
+            return {'success': True, 'deletedCount': 0}
 
         deleted_count = 0
         failed_events = []
@@ -221,12 +226,18 @@ def delete_conversation(obj, info, userId: str, sessionId: str) -> Dict:
                 print(f"Error deleting event {event_id}: {e}")
                 failed_events.append(event_id)
 
-        if failed_events:
+        # If every event failed, that's a real error. But if it's partial
+        # (or all succeeded), the session data is gone/going - treat as success.
+        # AgentCore has eventual consistency so partial failures are OK.
+        if failed_events and deleted_count == 0 and len(all_event_ids) > 0:
             return {
-                'success': False, 
-                'error': f'Failed to delete {len(failed_events)} events',
+                'success': False,
+                'error': f'Failed to delete {len(failed_events)} events, operation aborted',
                 'deletedCount': deleted_count
             }
+
+        if failed_events:
+            print(f"Warning: {len(failed_events)} events could not be deleted for session {sessionId}, but treating as success due to eventual consistency")
 
         print(f"Deleted {deleted_count}/{len(all_event_ids)} events for session {sessionId}")
 

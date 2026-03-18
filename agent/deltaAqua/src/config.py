@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_SECRET_KEY: str
     LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
+    
+    # AgentCore Memory Strategy IDs
+    EPISODIC_STRATEGY_ID: str
+    SUMMARY_STRATEGY_ID: str
+    SEMANTIC_STRATEGY_ID: str
+    PREFERENCE_STRATEGY_ID: str
 
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 

@@ -25,21 +25,20 @@ from .prompts import (
     INTENT_SYSTEM_PROMPT,
     ANALYSIS_SYSTEM_PROMPT, 
     EXECUTION_SYSTEM_PROMPT, 
-    COGNIVE_INTRO, 
-    COGNIVE_CAPABILITIES_GENERAL,
-    COGNIVE_FAQ,
     NO_TOOLS_FOUND,
     TOOLKIT_INIT_FAILED,
     NO_TOOLS_IN_TOOLKIT,
     ANALYSIS_FALLBACK_REASONING,
-    GENERIC_ERROR_MESSAGE
+    GENERIC_ERROR_MESSAGE,
 )
 
 from config import settings
 from utils import get_logger
 from memory import ChatMemory
+from memory.context_manager import ContextManager
 from agent.chat_namer import ChatNamer
 from agent.event_streaming import stream_event
+from agent.personality import PersonalityHandler
 from langchain_core.callbacks import AsyncCallbackHandler
 
 logger = get_logger(__name__)
@@ -54,8 +53,10 @@ class AnalysisOutput(BaseModel):
     intent: str = Field(description="What user wants to accomplish")
 
 class IntentOutput(BaseModel):
-    intent: Literal["identity", "capabilities", "task"]
-    toolkits: List[str] = Field(description="List of up to 2 best matching toolkit slugs from the catalog")
+    intent: Literal["greeting", "identity", "user_identity", "capabilities", "task"]
+    app_mentioned: bool = Field(description="True if user explicitly mentioned an app name")
+    app_slugs: List[str] = Field(default_factory=list, description="List of app slugs if user mentioned specific apps")
+    relevant_categories: List[str] = Field(default_factory=list, description="Relevant app categories (email, team chat, etc.)")
 
 
 class AnalysisAgent:
@@ -69,11 +70,12 @@ class AnalysisAgent:
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(
                 _executor,
-                self.memory_client.retrieve_memories,
-                settings.AGENTCORE_MEMORY_ID,
-                namespace,
-                query,
-                3
+                lambda: self.memory_client.retrieve_memories(
+                    memoryId=settings.AGENTCORE_MEMORY_ID,
+                    namespace=namespace,
+                    query=query,
+                    maxResults=3
+                )
             )
         except:
             return []
@@ -131,13 +133,13 @@ class ExecutionAgent:
         self.langfuse_handler = LangfuseCallbackHandler()
     
     @observe(name="execution")
-    async def execute(self, user_message: str, tools: List[Any], user_id: str, conversation_id: str) -> str:
+    async def execute(self, user_message: str, tools: List[Any], user_id: str, conversation_id: str, memory_context: str = "") -> str:
         checkpointer = AgentCoreMemorySaver(
             memory_id=settings.AGENTCORE_MEMORY_ID,
             region_name=settings.AWS_REGION
         )
         
-        system_prompt = EXECUTION_SYSTEM_PROMPT.format(user_message=user_message)
+        system_prompt = EXECUTION_SYSTEM_PROMPT.format(memory_context=memory_context)
 
         agent = create_react_agent(
             model=self.llm,
@@ -174,12 +176,12 @@ class AgentService:
         self.execution_agent = ExecutionAgent()
         self.chat_memory = ChatMemory()
         self.chat_namer = ChatNamer()
+        self.memory_client = get_memory_client()
         self._router_llm = instructor.from_bedrock(
             get_bedrock_client(), 
             model=settings.BEDROCK_MODEL_ID
         )
         
-        # Load toolkits catalog
         catalog_path = os.path.join(os.path.dirname(__file__), "toolkits_catalog.json")
         try:
             with open(catalog_path, "r") as f:
@@ -187,10 +189,21 @@ class AgentService:
         except Exception as e:
             logger.error(f"Failed to load toolkits catalog: {e}")
             self.toolkits_catalog = []
-
+        
+        # Initialize context manager and personality handler
+        self.context_manager = ContextManager(self.memory_client, self.toolkits_catalog)
+        self.personality_handler = PersonalityHandler(
+            self.execution_agent.llm, 
+            self.chat_memory, 
+            self.memory_client
+        )
+    
+    
     @observe(name="intent_classification")
     def _classify_intent(self, user_message: str) -> IntentOutput:
-        system_prompt = INTENT_SYSTEM_PROMPT.format(catalog=json.dumps(self.toolkits_catalog))
+
+        catalog_str = "\n".join([f"{a['slug']} | {a['name']} | {a['description']} | {a['category']}" for a in self.toolkits_catalog])
+        system_prompt = INTENT_SYSTEM_PROMPT.format(catalog=catalog_str)
         try:
             return self._router_llm.chat.completions.create(
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
@@ -198,7 +211,7 @@ class AgentService:
             )
         except Exception as e:
             logger.error(f"Intent classification failed: {e}")
-            return IntentOutput(intent="task", toolkits=[])
+            return IntentOutput(intent="task", app_mentioned=False, app_slugs=[], relevant_categories=[])
 
     @observe(name="execute_task")
     async def execute_task(self, user_message: str, user_id: str, conversation_id: str, chat_name: str = None) -> dict:
@@ -213,61 +226,115 @@ class AgentService:
             intent_output = await asyncio.get_event_loop().run_in_executor(
                 _executor, lambda: self._classify_intent(user_message)
             )
-            logger.info(f"Intent: {intent_output.intent} toolkits={intent_output.toolkits}")
+            logger.info(f"Intent: {intent_output.intent}, app_mentioned={intent_output.app_mentioned}, app_slugs={intent_output.app_slugs}")
+
+            original_message = user_message
+            
+            if intent_output.app_mentioned and intent_output.app_slugs and len(user_message.strip().split()) <= 3:
+                logger.info("Short message with app mention detected, checking for original request...")
+                original_request = self.chat_memory.get_original_request(user_id, conversation_id)
+                
+                if original_request:
+                    app_names = [app['name'] for app in self.toolkits_catalog if app['slug'] in intent_output.app_slugs]
+                    app_name = app_names[0] if app_names else intent_output.app_slugs[0]
+                    user_message = f"{original_request} using {app_name}"
+                    logger.info(f"Combined request: '{user_message}'")
 
             # Personality routing
+            if intent_output.intent == 'greeting':
+                return await self.personality_handler.handle_greeting(
+                    original_message, user_id, conversation_id, chat_name
+                )
+
             if intent_output.intent == 'identity':
-                msg_lower = user_message.lower()
-                faq_response = None
-                for key, answer in COGNIVE_FAQ.items():
-                    if key in msg_lower or any(word in msg_lower for word in key.split('_')):
-                        faq_response = answer
-                        break
-                response = faq_response if faq_response else COGNIVE_INTRO
-                self.chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
-                self.chat_memory.store_message(user_id, conversation_id, response, 'ASSISTANT')
-                return {
-                    "response": response,
-                    "awaiting_user": False,
-                    "rag_tools_found": 0,
-                    "rag_tool_names": [],
-                    "success": True,
-                    "chatName": chat_name,
-                    "personality_response": True
-                }
+                return await self.personality_handler.handle_identity(
+                    original_message, user_id, conversation_id, chat_name
+                )
+
+            if intent_output.intent == 'user_identity':
+                return await self.personality_handler.handle_user_identity(
+                    original_message, user_id, conversation_id, chat_name
+                )
 
             if intent_output.intent == 'capabilities':
-                self.chat_memory.store_message(user_id, conversation_id, user_message, 'USER')
-                self.chat_memory.store_message(user_id, conversation_id, COGNIVE_CAPABILITIES_GENERAL, 'ASSISTANT')
-                return {
-                    "response": COGNIVE_CAPABILITIES_GENERAL,
-                    "awaiting_user": False,
-                    "rag_tools_found": 0,
-                    "rag_tool_names": [],
-                    "success": True,
-                    "chatName": chat_name,
-                    "personality_response": True
-                }
+                return await self.personality_handler.handle_capabilities(
+                    original_message, user_id, conversation_id, chat_name
+                )
 
-            # Step 2: RAG + memory in parallel
+            toolkits = []
+            
+            if intent_output.app_mentioned and intent_output.app_slugs:
+                toolkits = intent_output.app_slugs
+                logger.info(f"User mentioned: {toolkits}")
+            else:
+                logger.info("No app mentioned, checking context...")
+                context_apps = await self.context_manager.get_app_from_context(user_id, conversation_id)
+                
+                if context_apps:
+                    toolkits = context_apps
+                    logger.info(f"Found in context: {toolkits}")
+                else:
+                    logger.info("No context, asking user...")
+                    stream_event(conversation_id, "init", "Finding relevant apps...")
+                    
+                    relevant_apps = []
+                    if intent_output.relevant_categories:
+                        for app in self.toolkits_catalog:
+                            if any(cat.lower() in app.get('raw_category', '').lower() for cat in intent_output.relevant_categories):
+                                relevant_apps.append(app)
+                    
+                    if not relevant_apps:
+                        rag_tools_temp = await self.rag.search_tools(user_message, top_k=10)
+                        seen_slugs = set()
+                        for tool in rag_tools_temp:
+                            if tool.toolkit not in seen_slugs:
+                                app_info = next((a for a in self.toolkits_catalog if a["slug"] == tool.toolkit), None)
+                                if app_info:
+                                    relevant_apps.append(app_info)
+                                    seen_slugs.add(tool.toolkit)
+                    
+                    if relevant_apps:
+                        app_list = "\n".join([f"- **{app['name']}** ({app['description']})" for app in relevant_apps[:8]])
+                        clarification_response = f"I can help with that! Which app would you like me to use?\n\n{app_list}"
+                        
+                        self.chat_memory.store_message(user_id, conversation_id, user_message, 'USER', event_type='original_request')
+                        self.chat_memory.store_message(user_id, conversation_id, clarification_response, 'ASSISTANT')
+                        
+                        return {
+                            "response": clarification_response,
+                            "awaiting_user": True,
+                            "rag_tools_found": 0,
+                            "rag_tool_names": [],
+                            "toolkits_used": [],
+                            "success": True,
+                            "chatName": chat_name,
+                            "personality_response": False,
+                            "needs_clarification": True,
+                            "connection_url": ""
+                        }
+            
+            logger.info(f"Using toolkits: {toolkits}")
+            
             stream_event(conversation_id, "init", "Searching knowledge base for accessible tools...")
 
-            if intent_output.toolkits:
+            if toolkits:
+                expanded_toolkits = self.context_manager.expand_toolkit_names(toolkits[:2])
+                logger.info(f"Expanded toolkits: {expanded_toolkits}")
                 rag_task = self.rag.search_tools(
                     user_message,
                     top_k=15,
-                    filter={"toolkit": {"$in": intent_output.toolkits[:2]}}
+                    filter={"toolkit": {"$in": expanded_toolkits}}
                 )
             else:
-                rag_task = self.rag.search_tools(user_message, top_k=15)
+                rag_task = self.rag.search_tools(user_message, top_k=10)
 
             pref_task = self.analysis_agent._retrieve_memories(f"/users/{user_id}/preferences", "user preferences")
             context_task = self.analysis_agent._retrieve_memories(f"/semantic/{user_id}", user_message)
 
             rag_tools, preferences, semantic_context = await asyncio.gather(rag_task, pref_task, context_task)
 
-            if intent_output.toolkits:
-                logger.info(f"RAG: Found {len(rag_tools)} tools in {intent_output.toolkits[:2]}")
+            if toolkits:
+                logger.info(f"RAG: Found {len(rag_tools)} tools in {toolkits[:2]}")
 
             if not rag_tools:
                 return {
@@ -281,17 +348,36 @@ class AgentService:
             
             logger.info(f"RAG: {len(rag_tools)} tools")
             
-            # Step 3: Analysis
-            stream_event(conversation_id, "init", f"Selecting optimal tools & strategies...")
+            stream_event(conversation_id, "init", f"Analyzing tools and planning execution strategy...")
             analysis = await self.analysis_agent.analyze(
                 user_message, user_id, rag_tools, 
                 preferences=preferences, 
                 semantic_context=semantic_context
             )
-            logger.info(f"Analysis: {analysis.relevant_toolkits} ({analysis.confidence})")
+            logger.info(f"Analysis: selected {len(analysis.selected_slugs)} tools ({analysis.confidence})")
+            logger.info(f"Selected tools: {analysis.selected_slugs}")
             
-            primary_toolkit = analysis.relevant_toolkits[0] if analysis.relevant_toolkits else "unknown"
+            if toolkits:
+                primary_toolkit = toolkits[0]
+            else:
+                toolkits = analysis.relevant_toolkits
+                primary_toolkit = toolkits[0] if toolkits else "unknown"
+            
             selected_slugs = analysis.selected_slugs
+
+            if not toolkits:
+                return {
+                    "response": "I couldn't find the right tools for your request.",
+                    "awaiting_user": True,
+                    "rag_tools_found": len(rag_tools),
+                    "rag_tool_names": [t.tool_slug for t in rag_tools],
+                    "toolkits_used": [],
+                    "success": False,
+                    "chatName": chat_name,
+                    "personality_response": False,
+                    "needs_clarification": False,
+                    "connection_url": ""
+                }
 
             # Step 4: Composio tool loading
             try:
@@ -299,12 +385,12 @@ class AgentService:
                 
                 session = self.sdk.create(
                     user_id=user_id, 
-                    toolkits=analysis.relevant_toolkits,
+                    toolkits=toolkits,
                     manage_connections={"callback_url": settings.CALLBACK_URL}
                 )
 
                 toolkits_data = session.toolkits()
-                for tk in analysis.relevant_toolkits:
+                for tk in toolkits:
                     is_connected = any(
                         t.slug.lower() == tk.lower() and t.connection and t.connection.is_active 
                         for t in toolkits_data.items
@@ -339,12 +425,20 @@ class AgentService:
                 if selected_slugs:
                     try:
                         tools = [*self.sdk.tools.get(user_id=user_id, tools=selected_slugs)]
-                        logger.info(f"Loaded {len(tools)} precise tools: {selected_slugs}")
+                        loaded_slugs = [t.name for t in tools]
+                        logger.info(f"Requested slugs: {selected_slugs}")
+                        logger.info(f"Loaded {len(tools)} tools with slugs: {loaded_slugs}")
+                        for tool in tools:
+                            logger.info(f"Tool {tool.name}: description={getattr(tool, 'description', 'NO DESCRIPTION')[:100]}")
                     except Exception as e:
                         logger.error(f"Failed to fetch precise tools {selected_slugs}, falling back: {e}")
-                        tools = [*self.sdk.tools.get(user_id=user_id, toolkits=analysis.relevant_toolkits)][:5]
+                        tools = [*self.sdk.tools.get(user_id=user_id, toolkits=toolkits)][:5]
+                        loaded_slugs = [t.name for t in tools]
+                        logger.info(f"Fallback loaded {len(tools)} tools: {loaded_slugs}")
                 else:
-                    tools = [*self.sdk.tools.get(user_id=user_id, toolkits=analysis.relevant_toolkits)][:5]
+                    tools = [*self.sdk.tools.get(user_id=user_id, toolkits=toolkits)][:5]
+                    loaded_slugs = [t.name for t in tools]
+                    logger.info(f"No slugs selected, loaded {len(tools)} tools from toolkits: {loaded_slugs}")
 
             except Exception as e:
                 logger.error(f"Composio Tool retrieval failed: {e}")
@@ -370,8 +464,11 @@ class AgentService:
             logger.info(f"Loaded {len(tools)} tools for {primary_toolkit}")
             
             stream_event(conversation_id, "execute", f"Loading '{primary_toolkit}' functionality and initializing Execution Agent...")
-            
-            final = await self.execution_agent.execute(user_message, tools, user_id, conversation_id)
+
+            # Build and inject full memory context into the execution agent's system prompt
+            memory_context = await self.context_manager.build_memory_context(user_id, conversation_id)
+
+            final = await self.execution_agent.execute(user_message, tools, user_id, conversation_id, memory_context=memory_context)
             
             stream_event(conversation_id, "completed", "Task completed.")
             logger.info(f"Completed in {time.time() - start:.2f}s")
@@ -381,7 +478,7 @@ class AgentService:
                 "awaiting_user": False,
                 "rag_tools_found": len(rag_tools),
                 "rag_tool_names": [t.tool_slug for t in rag_tools],
-                "toolkits_used": analysis.relevant_toolkits,
+                "toolkits_used": toolkits,
                 "success": True,
                 "chatName": chat_name
             }

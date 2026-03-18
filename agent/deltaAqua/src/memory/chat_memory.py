@@ -47,13 +47,18 @@ class ChatMemory:
             logger.error(f"Failed to retrieve chat name for session {session_id}: {e}")
             return None
     
-    def store_message(self, actor_id: str, session_id: str, message: str, role: str, is_chat_name: bool = False):
+    def store_message(self, actor_id: str, session_id: str, message: str, role: str, is_chat_name: bool = False, event_type: str = None):
         """Store a message event with optional chat_name metadata"""
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc)
         
+        if event_type:
+            event_type_value = event_type
+        else:
+            event_type_value = 'chat_name' if is_chat_name else f'{role.lower()}_message'
+        
         metadata = {
-            'event_type': {'stringValue': 'chat_name' if is_chat_name else f'{role.lower()}_message'},
+            'event_type': {'stringValue': event_type_value},
             'source': {'stringValue': 'agent'}
         }
         
@@ -70,7 +75,40 @@ class ChatMemory:
             }],
             metadata=metadata
         )
-        logger.info(f"Stored {role} message for session {session_id} (chat_name={is_chat_name})")
+        logger.info(f"Stored {role} message for session {session_id} (event_type={event_type_value})")
+    
+    def get_original_request(self, actor_id: str, session_id: str) -> str | None:
+        """Get the original user request before clarification"""
+        try:
+            events_response = self.bedrock_client.list_events(
+                memoryId=self.memory_id,
+                actorId=actor_id,
+                sessionId=session_id,
+                maxResults=20,
+                includePayloads=True
+            )
+            
+            events = events_response.get('events', [])
+            for event in events:
+                metadata = event.get('metadata', {})
+                event_type = metadata.get('event_type', {}).get('stringValue', '')
+                
+                if event_type == 'original_request':
+                    payload = event.get('payload', [])
+                    if payload and isinstance(payload, list):
+                        for item in payload:
+                            if isinstance(item, dict) and 'conversational' in item:
+                                content = item['conversational'].get('content', {})
+                                text = content.get('text', '')
+                                if text:
+                                    logger.info(f"Found original request: {text}")
+                                    return text
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get original request: {e}")
+            return None
     
     def is_first_message(self, actor_id: str, session_id: str) -> bool:
         """Check if this is the first message in the session"""

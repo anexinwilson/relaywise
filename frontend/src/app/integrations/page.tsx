@@ -25,15 +25,30 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     setMounted(true);
-    // Fetch initial connected state from server
-    fetch("/api/integrations/connected")
-      .then(res => res.json())
-      .then(data => {
+    
+    const fetchConnected = async () => {
+      try {
+        const res = await fetch("/api/integrations/connected");
+        const data = await res.json();
         if (data.slugs && Array.isArray(data.slugs)) {
           data.slugs.forEach((slug: string) => connectIntegration(slug));
         }
-      })
-      .catch(err => console.error("Failed to fetch connected apps:", err));
+      } catch (err) {
+        console.error("Failed to fetch connected apps:", err);
+      }
+    };
+    
+    fetchConnected();
+    
+    const handleFocus = () => {
+      fetchConnected();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const connectedIntegrations = useConnectedIntegrations();
@@ -96,7 +111,6 @@ export default function IntegrationsPage() {
 
   const handleDisconnect = async (appId: string) => {
     try {
-      // Optimistic UI update
       disconnectIntegration(appId);
       
       const res = await fetch("/api/integrations/disconnect", {
@@ -108,9 +122,17 @@ export default function IntegrationsPage() {
       if (!res.ok) {
         throw new Error("Failed to disconnect");
       }
+
+      const verifyRes = await fetch("/api/integrations/connected");
+      const data = await verifyRes.json();
+      if (data.slugs && Array.isArray(data.slugs)) {
+        data.slugs.forEach((slug: string) => {
+          if (slug !== appId) connectIntegration(slug);
+        });
+      }
+      
     } catch (err) {
       console.error("Disconnect Error:", err);
-      // Optional: rollback Zustand if failed
       connectIntegration(appId);
     }
   };

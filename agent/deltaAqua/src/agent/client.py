@@ -2,7 +2,6 @@ import boto3
 from concurrent.futures import ThreadPoolExecutor
 from pinecone import Pinecone
 from composio import Composio
-from bedrock_agentcore.memory import MemoryClient
 from upstash_redis import Redis
 from config import settings
 
@@ -22,7 +21,7 @@ def get_bedrock_client():
 def get_memory_client():
     global _memory_client
     if _memory_client is None:
-        _memory_client = MemoryClient(region_name=settings.AWS_REGION)
+        _memory_client = boto3.client('bedrock-agentcore', region_name=settings.AWS_REGION)
     return _memory_client
 
 def get_pinecone_index():
