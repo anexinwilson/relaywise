@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,6 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const connectedIntegrations = useConnectedIntegrations();
   const disconnectIntegration = useAppStore(
     (state) => state.disconnectIntegration
@@ -44,28 +44,6 @@ export default function SettingsPage() {
   const [inAppNotifications, setInAppNotifications] = useState(true);
   const [autoPause, setAutoPause] = useState(true);
   const [saved, setSaved] = useState(false);
-  const [UserButtonComponent, setUserButtonComponent] = useState<React.ComponentType<{ afterSignOutUrl?: string }> | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-    
-    // Check if Clerk is properly configured
-    const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    const hasClerk = key && !key.startsWith("pk_test_placeholder");
-
-    if (hasClerk) {
-      import("@clerk/nextjs").then((clerk) => {
-        setUserButtonComponent(() => clerk.UserButton);
-        
-        // Try to get user info
-        const { useUser } = clerk;
-        // Note: This is a hook and should be called at component level,
-        // but for simplicity we'll keep the demo values
-      }).catch(() => {
-        // Clerk not available
-      });
-    }
-  }, []);
 
   // Get connected apps details
   const connectedAppsDetails = connectedIntegrations;
@@ -108,14 +86,6 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background" data-testid="settings-page">
       {/* Header */}
@@ -143,13 +113,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {UserButtonComponent ? (
-            <UserButtonComponent afterSignOutUrl="/" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <User className="w-4 h-4 text-primary" />
-            </div>
-          )}
+          <UserButton fallback={<User className="w-4 h-4 text-primary" />} />
         </div>
       </header>
 

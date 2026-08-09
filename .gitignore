@@ -1,0 +1,40 @@
+scratch/
+/tests/
+
+# Private project-planning material
+.kiro/
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# JavaScript dependencies and build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Terraform local state and generated working data
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

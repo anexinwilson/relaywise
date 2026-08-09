@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AgentEvent } from "@/types";
@@ -9,18 +9,7 @@ interface ThinkingBoxProps {
 }
 
 export function ThinkingBox({ logs, isComplete }: ThinkingBoxProps) {
-  // Always expand if actively running, optionally auto-collapse when complete
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
-
-  // Auto-collapse when complete, but only once
-  useEffect(() => {
-    if (isComplete && !hasAutoCollapsed) {
-      setIsExpanded(false);
-      setHasAutoCollapsed(true);
-    }
-  }, [isComplete, hasAutoCollapsed]);
+  const [isExpanded, setIsExpanded] = useState(!isComplete);
 
   if (logs.length === 0) return null;
 

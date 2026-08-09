@@ -34,12 +34,6 @@ const createAppSyncLink = () => {
   const endpoint = process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT || "";
   const region = "us-east-1";
 
-  console.log('[Apollo] Subscription config:', {
-    endpoint: endpoint.substring(0, 50) + '...',
-    apiKeyPrefix: apiKey.substring(0, 10) + '...',
-    region
-  });
-
   const subscriptionLink = createSubscriptionHandshakeLink({
     url: endpoint,
     region,

@@ -1,26 +1,26 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Settings, Plug, User } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import type { Integration } from "@/types";
 
 interface DashboardHeaderProps {
   connectedIntegrations: Integration[];
   onIntegrationsClick: () => void;
   onSettingsClick: () => void;
-  UserButtonComponent: React.ComponentType<{ afterSignOutUrl?: string }> | null;
 }
 
 export function DashboardHeader({
   connectedIntegrations,
   onIntegrationsClick,
   onSettingsClick,
-  UserButtonComponent,
 }: DashboardHeaderProps) {
 
   return (
     <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
       <Link href="/" className="flex items-center gap-2">
-        <img
+        <Image
           src="/cognive-logo.svg"
           alt="Cognive"
           width={32}
@@ -64,13 +64,7 @@ export function DashboardHeader({
         >
           <Settings className="w-5 h-5" />
         </Button>
-        {UserButtonComponent ? (
-          <UserButtonComponent afterSignOutUrl="/" />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <User className="w-4 h-4 text-primary" />
-          </div>
-        )}
+        <UserButton fallback={<User className="w-4 h-4 text-primary" />} />
       </div>
     </header>
   );

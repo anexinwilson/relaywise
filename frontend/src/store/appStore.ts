@@ -3,7 +3,15 @@ import { persist } from "zustand/middleware";
 import type { Integration, Task, ChatMessage } from "@/types";
 import appsCatalog from "@/apps_catalog.json";
 
-const formattedIntegrations: Integration[] = (appsCatalog as any[]).map((app) => ({
+interface CatalogIntegration {
+  slug: string;
+  name: string;
+  description: string;
+  logo: string;
+  category: string;
+}
+
+const formattedIntegrations: Integration[] = (appsCatalog as CatalogIntegration[]).map((app) => ({
   ...app,
   id: app.slug,
   supportsRealtime: false,

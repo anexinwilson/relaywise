@@ -15,7 +15,7 @@ export function MessageButtons({ onOptionClick }: MessageButtonsProps) {
     <div className="flex flex-col items-center justify-center min-h-[400px] space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold text-foreground">
-          Hi! I'm ready to help you create a new automation.
+          Hi! I&apos;m ready to help you create a new automation.
         </h2>
         <p className="text-muted-foreground">
           What would you like to automate?

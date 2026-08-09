@@ -15,7 +15,6 @@ export async function POST(req: Request) {
 
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
     const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-    const agentEndpoint = process.env.AGENT_ENDPOINT || "http://localhost:8080";
     const redisKey = `connected_apps:${userId}`;
 
     // 1. Get the connectedAccountId from Redis (needed for Composio revocation)
@@ -39,8 +38,10 @@ export async function POST(req: Request) {
       }).catch(() => {});
     }
 
-    // 4. Fire-and-forget AgentCore to revoke in Composio (fixed path: /invocations)
-    fetch(`${agentEndpoint}/invocations`, {
+    const controlEndpoint = process.env.COMPOSIO_CONTROL_URL;
+    if (!controlEndpoint) throw new Error("COMPOSIO_CONTROL_URL is not configured");
+    // Revoke the connection through the Composio control plane.
+    fetch(`${controlEndpoint}/disconnect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         appSlug: slug,
         connectedAccountId,
       }),
-    }).catch((err) => console.error("AgentCore disconnect failed:", err));
+    }).catch((err) => console.error("Connection revoke failed:", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

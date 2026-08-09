@@ -18,10 +18,11 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // First, ask AgentCore to sync latest connected apps into Redis
+    // Refresh the app connection cache through the control-plane API.
     try {
-      const agentEndpoint = process.env.AGENT_ENDPOINT || "http://localhost:8080";
-      await fetch(`${agentEndpoint}/invocations`, {
+      const controlEndpoint = process.env.COMPOSIO_CONTROL_URL;
+      if (!controlEndpoint) throw new Error("COMPOSIO_CONTROL_URL is not configured");
+      await fetch(`${controlEndpoint}/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

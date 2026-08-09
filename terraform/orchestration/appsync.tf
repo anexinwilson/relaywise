@@ -2,7 +2,7 @@ resource "aws_appsync_graphql_api" "main" {
   name                = "cognive-appsync"
   authentication_type = "AWS_LAMBDA"
   lambda_authorizer_config {
-    authorizer_uri                   = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cognive-authorizer"
+    authorizer_uri                   = var.authorizer_function_arn
     authorizer_result_ttl_in_seconds = 300
   }
   additional_authentication_provider {
@@ -44,8 +44,6 @@ type Subscription {
 type AgentResponse @aws_lambda {
   success: Boolean
   response: String
-  rag_tools_found: Int
-  rag_tool_names: [String]
   error: String
   taskId: String
   sessionId: String
@@ -110,7 +108,7 @@ data "aws_caller_identity" "current" {}
 
 resource "aws_appsync_api_key" "main" {
   api_id  = aws_appsync_graphql_api.main.id
-  expires = "2027-01-31T00:00:00Z"
+  expires = var.appsync_api_key_expires
 }
 
 resource "aws_appsync_datasource" "lambda" {
@@ -119,17 +117,7 @@ resource "aws_appsync_datasource" "lambda" {
   type             = "AWS_LAMBDA"
   service_role_arn = aws_iam_role.appsync_lambda_role.arn
   lambda_config {
-    function_arn = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cognive-lambda"
-  }
-}
-
-resource "aws_appsync_datasource" "agentcore_http" {
-  api_id           = aws_appsync_graphql_api.main.id
-  name             = "AgentCoreHTTPDataSource"
-  type             = "HTTP"
-  service_role_arn = aws_iam_role.appsync_lambda_role.arn
-  http_config {
-    endpoint = var.agentcore_endpoint
+    function_arn = var.lambda_function_arn
   }
 }
 
@@ -143,22 +131,23 @@ resource "aws_appsync_datasource" "local" {
 resource "aws_lambda_permission" "appsync_invoke" {
   statement_id  = "AllowAppSyncInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "cognive-lambda"
+  function_name = var.lambda_function_arn
   principal     = "appsync.amazonaws.com"
 }
 
 resource "aws_lambda_permission" "appsync_authorizer_invoke" {
   statement_id  = "AllowAppSyncAuthorizerInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "cognive-authorizer"
+  function_name = var.authorizer_function_arn
   principal     = "appsync.amazonaws.com"
 }
 
 resource "aws_appsync_resolver" "ask_agent" {
+  count       = var.bootstrap_mode ? 0 : 1
   api_id      = aws_appsync_graphql_api.main.id
   type        = "Query"
   field       = "askAgent"
-  data_source = aws_appsync_datasource.agentcore_http.name
+  data_source = aws_appsync_datasource.lambda.name
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -166,32 +155,20 @@ resource "aws_appsync_resolver" "ask_agent" {
   code = <<-EOF
 export function request(ctx) {
   const payload = {
-    action: 'ask_agent',
-    userId: ctx.identity.resolverContext.userId,
-    sessionId: ctx.args.sessionId || null,
-    message: ctx.args.message
+    info: { fieldName: ctx.info.fieldName },
+    arguments: ctx.args,
+    identity: ctx.identity
   };
-  return {
-    method: 'POST',
-    resourcePath: '/invocations',
-    params: {
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }
-  };
+  return { operation: 'Invoke', payload };
 }
 export function response(ctx) {
-  const { statusCode, body } = ctx.result;
-  if (statusCode === 200) {
-    return JSON.parse(body);
-  }
-  util.appendError(body, statusCode);
-  return null;
+  if (ctx.error) return util.appendError(ctx.error.message, ctx.error.type);
+  return ctx.result;
 }
 EOF
 }
 
-# CRITICAL: NONE resolver required for EventBridge mutations to trigger subscriptions
+# NONE resolver publishes the worker's completion mutation to subscriptions.
 resource "aws_appsync_resolver" "publish_task_complete" {
   api_id      = aws_appsync_graphql_api.main.id
   type        = "Mutation"

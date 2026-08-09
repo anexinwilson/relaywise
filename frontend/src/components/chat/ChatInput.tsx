@@ -7,9 +7,6 @@ interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  onIntegrationsClick: () => void;
-  onWorkflowClick: () => void;
-  onLogsClick: () => void;
   disabled?: boolean;
 }
 
@@ -17,9 +14,6 @@ export function ChatInput({
   value,
   onChange,
   onSubmit,
-  onIntegrationsClick,
-  onWorkflowClick,
-  onLogsClick,
   disabled,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);

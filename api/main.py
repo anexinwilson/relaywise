@@ -1,13 +1,14 @@
 import uvicorn
 import asyncio
 from mangum import Mangum
-from app.app import app, graphql_resolver
+from app.app import app
+from handler import lambda_handler as appsync_handler
 
 mangum_handler = Mangum(app)
 
 def handler(event, context):
     if "info" in event and "fieldName" in event.get("info", {}):
-        return graphql_resolver(event)
+        return appsync_handler(event, context)
     else:
         return mangum_handler(event, context)
 

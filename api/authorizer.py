@@ -3,6 +3,7 @@ import jwt
 import boto3
 from jwt import PyJWKClient
 from functools import lru_cache
+from app.observability import logger, metrics
 
 def get_secret():
     client = boto3.client('secretsmanager', region_name='us-east-1')
@@ -19,6 +20,8 @@ def get_jwks_client():
     domain = get_clerk_domain()
     return PyJWKClient(f"https://{domain}/.well-known/jwks.json")
 
+@logger.inject_lambda_context
+@metrics.log_metrics
 def lambda_handler(event, context):
     try:
         auth_header = event.get('authorizationToken', '')
@@ -37,6 +40,7 @@ def lambda_handler(event, context):
             issuer=f"https://{domain}"
         )
         
+        metrics.add_metric(name="AuthAccepted", unit="Count", value=1)
         return {
             "isAuthorized": True,
             "resolverContext": {
@@ -46,8 +50,12 @@ def lambda_handler(event, context):
         }
         
     except jwt.ExpiredSignatureError:
+        metrics.add_metric(name="AuthDenied", unit="Count", value=1)
         return {"isAuthorized": False, "context": {}}
     except jwt.InvalidTokenError:
+        metrics.add_metric(name="AuthDenied", unit="Count", value=1)
         return {"isAuthorized": False, "context": {}}
-    except Exception:
+    except Exception as exc:
+        metrics.add_metric(name="AuthError", unit="Count", value=1)
+        logger.exception("Authorizer failed", error_type=type(exc).__name__)
         return {"isAuthorized": False, "context": {}}

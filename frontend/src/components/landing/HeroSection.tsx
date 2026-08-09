@@ -17,26 +17,7 @@ const placeholderExamples = [
 export default function HeroSection() {
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
   const [chatInput, setChatInput] = useState("");
-  const [mounted, setMounted] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setMounted(true);
-    
-    // Check if Clerk is properly configured and try to get auth status
-    const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    const hasClerk = key && !key.startsWith("pk_test_placeholder");
-    
-    if (hasClerk) {
-      import("@clerk/nextjs").then((clerk) => {
-        // We can't use hooks outside of component render, so we'll skip auth check
-        // The redirect will happen anyway, and Clerk will handle auth state
-      }).catch(() => {
-        // Clerk not available
-      });
-    }
-  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -59,20 +40,6 @@ export default function HeroSection() {
       router.push("/auth/sign-up");
     }
   };
-
-  if (!mounted) {
-    return (
-      <section className="pt-40 md:pt-48 pb-20 px-6" data-testid="hero-section">
-        <div className="container mx-auto text-center max-w-5xl">
-          <div className="animate-pulse">
-            <div className="h-16 bg-muted rounded-lg mb-6 max-w-3xl mx-auto"></div>
-            <div className="h-6 bg-muted rounded-lg mb-8 max-w-2xl mx-auto"></div>
-            <div className="h-20 bg-muted rounded-2xl max-w-2xl mx-auto"></div>
-          </div>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section className="pt-40 md:pt-48 pb-20 px-6" data-testid="hero-section">

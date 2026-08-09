@@ -13,9 +13,10 @@ export async function POST(req: Request) {
       return new NextResponse("Missing app slug", { status: 400 });
     }
 
-    const agentEndpoint = process.env.AGENT_ENDPOINT || "http://localhost:8080";
+    const controlEndpoint = process.env.COMPOSIO_CONTROL_URL;
+    if (!controlEndpoint) throw new Error("COMPOSIO_CONTROL_URL is not configured");
 
-    const res = await fetch(`${agentEndpoint}/invocations`, {
+    const res = await fetch(`${controlEndpoint}/connect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     });
 
     if (!res.ok) {
-      throw new Error(`AgentCore error: ${res.statusText}`);
+      throw new Error(`Connection service error: ${res.statusText}`);
     }
 
     const data = await res.json();

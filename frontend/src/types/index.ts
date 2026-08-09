@@ -127,8 +127,6 @@ export interface IntegrationsData {
 export interface AgentResponse {
   success: boolean;
   response: string;
-  rag_tools_found: number;
-  rag_tool_names: string[];
   error: string | null;
   taskId: string;
   sessionId: string;
@@ -149,6 +147,20 @@ export interface AgentEvent {
   category: string;
   message: string;
   timestamp: string;
+}
+
+export interface ConversationSummary {
+  sessionId: string;
+  chatName: string;
+  lastModifiedAt: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  sender: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  type?: string;
 }
 
 export interface UserResponse {

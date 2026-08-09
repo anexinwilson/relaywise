@@ -1,74 +1,83 @@
-$AccountId = (aws sts get-caller-identity --query Account --output text)
-$Region = "us-east-1"
-$RepoName = "cognive-lambda-repo"
-$RepoUrl = "$AccountId.dkr.ecr.$Region.amazonaws.com/$RepoName"
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-Write-Host "Building Docker images in parallel..." -ForegroundColor Cyan
-
-$builds = @(
-    @{ Tag = "cognive-lambda";     File = "Dockerfile" },
-    @{ Tag = "cognive-authorizer"; File = "Dockerfile.authorizer" }
+param(
+    [string]$Region = "us-east-1",
+    [string]$RepositoryName = "cognive-lambda-repo",
+    [string]$ImageTag = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")
 )
 
-$buildJobs = $builds | ForEach-Object {
-    $tag  = $_.Tag
-    $file = $_.File
-    Start-Job -ScriptBlock {
-        Set-Location $using:ScriptDir
-        $output = docker build --provenance=false --platform linux/amd64 -t "$using:RepoUrl`:$using:tag" -f $using:file . 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Build failed for $using:tag`n$output"
-        }
-        $output
-    }
+$ErrorActionPreference = "Stop"
+$AccountId = aws sts get-caller-identity --query Account --output text
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($AccountId)) {
+    throw "Unable to resolve the active AWS account."
 }
 
-Write-Host "Waiting for builds to complete..." -ForegroundColor Yellow
-$buildJobs | Wait-Job | ForEach-Object {
-    $job = $_
-    if ($job.State -eq "Failed") {
-        Write-Error ($job | Receive-Job 2>&1)
-        $buildJobs | Remove-Job -Force
-        exit 1
-    }
-    Receive-Job $job
-}
-$buildJobs | Remove-Job -Force
+$RegistryUrl = "$AccountId.dkr.ecr.$Region.amazonaws.com"
+$RepositoryUrl = "$RegistryUrl/$RepositoryName"
+$ScriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-Write-Host "All images built successfully." -ForegroundColor Green
-
-Write-Host "Logging into ECR..." -ForegroundColor Cyan
-aws ecr get-login-password --region $Region | docker login --username AWS --password-stdin $RepoUrl
-
+aws ecr describe-repositories `
+    --repository-names $RepositoryName `
+    --region $Region `
+    --output json | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "ECR login failed"
-    exit 1
+    throw "ECR repository '$RepositoryName' does not exist in account $AccountId ($Region)."
 }
 
-Write-Host "Pushing images in parallel..." -ForegroundColor Cyan
+Write-Host "Deploying Cognive Lambda images to AWS account $AccountId in $Region." -ForegroundColor Cyan
 
-$pushJobs = $builds | ForEach-Object {
-    $tag = $_.Tag
-    Start-Job -ScriptBlock {
-        $output = docker push "$using:RepoUrl`:$using:tag" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Push failed for $using:tag`n$output"
-        }
-        $output
+aws ecr get-login-password --region $Region |
+    docker login --username AWS --password-stdin $RegistryUrl
+if ($LASTEXITCODE -ne 0) {
+    throw "ECR login failed."
+}
+
+$Images = @(
+    @{
+        Name       = "lambda"
+        Dockerfile = "Dockerfile"
+        Tag        = "cognive-lambda-$ImageTag"
+    },
+    @{
+        Name       = "authorizer"
+        Dockerfile = "Dockerfile.authorizer"
+        Tag        = "cognive-authorizer-$ImageTag"
     }
-}
+)
 
-Write-Host "Waiting for pushes to complete..." -ForegroundColor Yellow
-$pushJobs | Wait-Job | ForEach-Object {
-    $job = $_
-    if ($job.State -eq "Failed") {
-        Write-Error ($job | Receive-Job 2>&1)
-        $pushJobs | Remove-Job -Force
-        exit 1
+$Results = @{}
+
+foreach ($Image in $Images) {
+    $TaggedUri = "$RepositoryUrl`:$($Image.Tag)"
+    Write-Host "Building $($Image.Name) image..." -ForegroundColor Cyan
+
+    docker build `
+        --pull `
+        --provenance=false `
+        --platform linux/amd64 `
+        --file (Join-Path $ScriptDirectory $Image.Dockerfile) `
+        --tag $TaggedUri `
+        $ScriptDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker build failed for $($Image.Name)."
     }
-    Receive-Job $job
-}
-$pushJobs | Remove-Job -Force
 
-Write-Host "Done! All images pushed to ECR." -ForegroundColor Green
+    docker push $TaggedUri
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker push failed for $($Image.Name)."
+    }
+
+    $Digest = aws ecr describe-images `
+        --repository-name $RepositoryName `
+        --image-ids "imageTag=$($Image.Tag)" `
+        --region $Region `
+        --query "imageDetails[0].imageDigest" `
+        --output text
+    if ($LASTEXITCODE -ne 0 -or $Digest -notmatch '^sha256:[0-9a-f]{64}$') {
+        throw "Unable to resolve the ECR digest for $($Image.Name)."
+    }
+
+    $Results[$Image.Name] = "$RepositoryUrl@$Digest"
+}
+
+Write-Host "Lambda images published successfully." -ForegroundColor Green
+Write-Output "lambda_image_uri=$($Results.lambda)"
+Write-Output "authorizer_image_uri=$($Results.authorizer)"

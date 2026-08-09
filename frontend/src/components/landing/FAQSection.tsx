@@ -41,7 +41,7 @@ The other thing none of them can do: ask a live question across multiple apps an
   {
     question: "Is my data private?",
     answer:
-      'Yes, and here is why you can trust that. Your data runs on AWS AgentCore, which is Amazon\'s infrastructure built specifically for AI agents that handle sensitive workflows. We chose it because it keeps your data isolated in memory, not sitting in a shared database where things can leak. The only way in is through your account login. Not us, not anyone else. Just you.\n\nFor critical workflows, Cognive will ask for your confirmation before doing anything. It does not act blindly.',
+      'Yes, and here is why you can trust that. Requests are authenticated with Clerk, queued through AWS, and processed by an isolated worker. Conversation state is scoped to your account in Postgres, and connected-app credentials remain managed by Composio.\n\nFor critical workflows, Cognive will ask for your confirmation before doing anything. It does not act blindly.',
   },
   {
     question: "Who is this for?",

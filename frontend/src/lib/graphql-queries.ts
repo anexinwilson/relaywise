@@ -5,7 +5,6 @@ export const ASK_AGENT_QUERY = gql`
     askAgent(message: $message, sessionId: $sessionId) {
       success
       response
-      rag_tools_found
       error
       taskId
       sessionId

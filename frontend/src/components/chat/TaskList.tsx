@@ -6,13 +6,6 @@ import { cn } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
 import type { Task } from "@/types";
 
-const statusIcons: Record<string, string> = {
-  running: "",
-  paused: "",
-  failed: "",
-  completed: "",
-};
-
 interface TaskListProps {
   tasks: Task[];
   currentTaskId: string | null;
@@ -75,7 +68,6 @@ export function TaskList({
   };
 
   const creditsPercent = Math.min((creditsUsed / creditsTotal) * 100, 100);
-  const creditsRemaining = creditsTotal - creditsUsed;
   const isCritical = creditsPercent > 80;
 
   return (

@@ -15,24 +15,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-  // If no valid Clerk key, render without Clerk provider (for local dev)
-  if (!publishableKey || publishableKey.startsWith("pk_test_placeholder")) {
-    return (
-      <html lang="en" className="dark">
-        <body className="antialiased" suppressHydrationWarning>
-          <ApolloWrapper>
-            {children}
-            <Toaster />
-          </ApolloWrapper>
-        </body>
-      </html>
-    );
-  }
-
   return (
-    <ClerkProvider publishableKey={publishableKey}>
+    <ClerkProvider>
       <html lang="en" className="dark">
         <body className="antialiased" suppressHydrationWarning>
           <ApolloWrapper>

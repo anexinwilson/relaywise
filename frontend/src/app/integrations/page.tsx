@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -10,22 +11,41 @@ import { Search, Check, Loader2, ArrowLeft, Plug } from "lucide-react";
 import { useAppStore, useConnectedIntegrations } from "@/store/appStore";
 import appsCatalog from "@/apps_catalog.json";
 import { cn } from "@/lib/utils";
+import type { Integration } from "@/types";
 
-const formattedApps = (appsCatalog as any[]).map((app) => ({
+interface CatalogApp {
+  slug: string;
+  name: string;
+  description: string;
+  logo: string;
+  category: string;
+}
+
+const formattedApps: Integration[] = (appsCatalog as CatalogApp[]).map((app) => ({
   ...app,
   id: app.slug,
+  supportsRealtime: false,
 }));
+
+const subscribeToHydration = () => () => undefined;
 
 export default function IntegrationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const router = useRouter();
+  const connectedIntegrations = useConnectedIntegrations();
+  const connectIntegration = useAppStore((state) => state.connectIntegration);
+  const disconnectIntegration = useAppStore(
+    (state) => state.disconnectIntegration
+  );
 
   useEffect(() => {
-    setMounted(true);
-    
     const fetchConnected = async () => {
       try {
         const res = await fetch("/api/integrations/connected");
@@ -49,13 +69,7 @@ export default function IntegrationsPage() {
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
-  }, []);
-
-  const connectedIntegrations = useConnectedIntegrations();
-  const connectIntegration = useAppStore((state) => state.connectIntegration);
-  const disconnectIntegration = useAppStore(
-    (state) => state.disconnectIntegration
-  );
+  }, [connectIntegration]);
 
   const allApps = formattedApps;
   const categories = Array.from(new Set(formattedApps.map(app => app.category))).sort();
@@ -161,7 +175,7 @@ export default function IntegrationsPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Link href="/" className="flex items-center gap-2">
-            <img
+            <Image
               src="/cognive-logo.svg"
               alt="Cognive"
               width={32}
@@ -229,13 +243,16 @@ export default function IntegrationsPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center p-1">
-                      <img
+                      <Image
                         src={app.logo}
                         alt={app.name}
+                        width={64}
+                        height={64}
+                        unoptimized
                         className="w-full h-full object-contain"
                         loading="lazy"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = getFallbackLogo(app.name);
+                          e.currentTarget.src = getFallbackLogo(app.name);
                         }}
                       />
                     </div>
@@ -312,13 +329,16 @@ export default function IntegrationsPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center p-1">
-                      <img
+                      <Image
                         src={app.logo}
                         alt={app.name}
+                        width={64}
+                        height={64}
+                        unoptimized
                         className="w-full h-full object-contain"
                         loading="lazy"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = getFallbackLogo(app.name);
+                          e.currentTarget.src = getFallbackLogo(app.name);
                         }}
                       />
                     </div>

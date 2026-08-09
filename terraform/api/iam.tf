@@ -4,8 +4,8 @@ resource "aws_iam_role" "lambda_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -24,57 +24,52 @@ resource "aws_iam_role_policy" "lambda_secrets_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = ["secretsmanager:GetSecretValue"]
-      Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:cognive/lambda/secrets-*"
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = aws_secretsmanager_secret.app_secrets.arn
     }]
   })
 }
 
-# Lambda policy to invoke AgentCore Runtime
-resource "aws_iam_role_policy" "lambda_agentcore_policy" {
-  name = "lambda-agentcore-policy"
+resource "aws_iam_role_policy" "lambda_queue_policy" {
+  name = "lambda-agent-queue-policy"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:InvokeAgentRuntime",
-          "bedrock-agentcore:InvokeAgentRuntimeForUser",
-          "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream",
-          "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStreamForUser",
-          "bedrock-agentcore:StopRuntimeSession"
-        ]
-        Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:*:runtime/*"
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.agent_tasks.arn
       }
     ]
   })
 }
 
-# Lambda policy to access AgentCore Memory
-resource "aws_iam_role_policy" "lambda_agentcore_memory_policy" {
-  name = "lambda-agentcore-memory-policy"
+resource "aws_iam_role_policy" "worker_runtime_policy" {
+  name = "worker-runtime-policy"
   role = aws_iam_role.lambda_role.id
-
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:ListSessions",
-          "bedrock-agentcore:ListEvents",
-          "bedrock-agentcore:CreateEvent",
-          "bedrock-agentcore:DeleteEvent",
-          "bedrock-agentcore:GetMemory",
-          "bedrock-agentcore:RetrieveMemory"
-        ]
-        Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:*:memory/*"
-      }
-    ]
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+      Resource = aws_sqs_queue.agent_tasks.arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_ecr_policy" {
+  name = "lambda-ecr-read-policy"
+  role = aws_iam_role.lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"]
+      Resource = aws_ecr_repository.lambda_repo.arn
+    }]
   })
 }
 
@@ -84,8 +79,8 @@ resource "aws_iam_role" "authorizer_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -104,9 +99,9 @@ resource "aws_iam_role_policy" "authorizer_secrets_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = ["secretsmanager:GetSecretValue"]
-      Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:cognive/lambda/secrets-*"
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = aws_secretsmanager_secret.app_secrets.arn
     }]
   })
 }

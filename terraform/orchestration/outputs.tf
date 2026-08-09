@@ -11,6 +11,3 @@ output "appsync_api_key" {
   sensitive = true
 }
 
-output "eventbridge_bus_name" {
-  value = aws_cloudwatch_event_bus.agentcore.name
-}
