@@ -3,7 +3,9 @@ import { parseAgentTaskResult } from "../agent-task-result";
 
 describe("parseAgentTaskResult", () => {
   it("parses the serialized AppSync task payload", () => {
-    expect(parseAgentTaskResult('{"chatName":"Inbox cleanup","response":"Done"}')).toEqual({
+    expect(
+      parseAgentTaskResult('{"chatName":"Inbox cleanup","response":"Done"}'),
+    ).toEqual({
       chatName: "Inbox cleanup",
       response: "Done",
     });

@@ -16,10 +16,15 @@ def publish_completion(
     error: str | None = None,
     execution_time: int = 0,
 ) -> None:
+    # AppSync delivers to subscribers only the fields selected *here*, intersected
+    # with the subscriber's own selection set. Any field omitted below arrives as
+    # null no matter what the payload carried — so `result` and `userId` must be
+    # requested even though this caller ignores the response. Dropping `result`
+    # leaves the browser with a completed task and no message to render.
     mutation = """
     mutation PublishTaskComplete($input: TaskCompleteInput!) {
       publishTaskComplete(input: $input) {
-        taskId status error executionTime timestamp
+        taskId userId status result error executionTime timestamp
       }
     }
     """

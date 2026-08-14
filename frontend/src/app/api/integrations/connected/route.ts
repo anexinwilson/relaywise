@@ -7,7 +7,7 @@ const catalogMap = Object.fromEntries(
   (catalog as { slug: string; name: string; logo: string }[]).map((app) => [
     app.slug,
     { name: app.name, logo: app.logo },
-  ])
+  ]),
 );
 
 export async function GET() {
@@ -18,22 +18,9 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Refresh the app connection cache through the control-plane API.
-    try {
-      const controlEndpoint = process.env.COMPOSIO_CONTROL_URL;
-      if (!controlEndpoint) throw new Error("COMPOSIO_CONTROL_URL is not configured");
-      await fetch(`${controlEndpoint}/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "sync_connections",
-          userId,
-        }),
-      });
-    } catch (err) {
-      console.error("[CONNECTED_APPS] sync_connections failed:", err);
-      // Continue gracefully; we'll just read whatever Redis currently has
-    }
+    // No sync here: the integrations page calls the syncConnections mutation,
+    // which reconciles Redis with Composio. This route is the cheap read used
+    // by the dashboard, so it must not depend on a control-plane round trip.
 
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
     const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -48,7 +35,7 @@ export async function GET() {
     const fetchUrl = `${redisUrl}/hkeys/${redisKey}`;
     console.log("[CONNECTED_APPS] userId:", userId);
     console.log("[CONNECTED_APPS] fetching:", fetchUrl);
-    
+
     const response = await fetch(fetchUrl, {
       headers: { Authorization: `Bearer ${redisToken}` },
     });

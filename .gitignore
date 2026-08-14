@@ -34,7 +34,17 @@ coverage/
 **/*.tfplan
 
 # Local editor and OS files
+#
+# These describe one machine's setup, not the project. Note that adding a path
+# here does not untrack a file already in the index — .gitignore is only
+# consulted for files git is not yet tracking.
 .vscode/
+.claude/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Terraform variable files hold per-person values (contact addresses, ids).
+# Only the .example is committed.
+*.tfvars
+!*.tfvars.example

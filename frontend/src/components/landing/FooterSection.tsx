@@ -18,12 +18,6 @@ export default function FooterSection() {
             >
               Integrations
             </Link>
-            <Link
-              href="/pricing"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Pricing
-            </Link>
           </div>
           <div className="text-center text-muted-foreground text-sm">
             <p>Built for humans who hate complicated tools</p>

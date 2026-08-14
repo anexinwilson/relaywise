@@ -1,0 +1,39 @@
+"""drop the hand-rolled user memory table
+
+Superseded by LangGraph's `AsyncPostgresStore`, which owns its own schema and
+is the framework's first-class cross-thread memory primitive. Keeping a second,
+parallel store would have meant two sources of truth for the same facts.
+"""
+
+from alembic import op
+import sqlalchemy as sa
+
+revision = "0003_drop_user_memories"
+down_revision = "0002_user_memories"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.drop_index("ix_user_memories_user_id", table_name="user_memories")
+    op.drop_table("user_memories")
+
+
+def downgrade() -> None:
+    op.create_table(
+        "user_memories",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.String(length=128), nullable=False),
+        sa.Column("kind", sa.String(length=16), nullable=False, server_default="fact"),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("source_session_id", sa.String(length=128), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("user_id", "content", name="uq_user_memory_content"),
+    )
+    op.create_index("ix_user_memories_user_id", "user_memories", ["user_id"])

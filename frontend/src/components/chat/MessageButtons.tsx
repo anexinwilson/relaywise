@@ -17,11 +17,9 @@ export function MessageButtons({ onOptionClick }: MessageButtonsProps) {
         <h2 className="text-2xl font-semibold text-foreground">
           Hi! I&apos;m ready to help you create a new automation.
         </h2>
-        <p className="text-muted-foreground">
-          What would you like to automate?
-        </p>
+        <p className="text-muted-foreground">What would you like to automate?</p>
       </div>
-      
+
       <div className="flex flex-wrap gap-3 justify-center">
         {options.map((option, i) => (
           <Button

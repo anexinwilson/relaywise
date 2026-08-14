@@ -59,8 +59,8 @@ export default function HeroSection() {
           transition={{ delay: 0.1 }}
           className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
         >
-          862 apps. Powered by Composio. Ask anything, do anything. Automate it
-          all — in plain English.
+          862 apps. Powered by Composio. Ask anything, do anything. Automate it all — in
+          plain English.
         </motion.p>
 
         <motion.div
@@ -87,7 +87,7 @@ export default function HeroSection() {
               </Button>
             </form>
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              Cognive will ask for the apps it needs
+              Relaywise will ask for the apps it needs
             </p>
           </div>
 

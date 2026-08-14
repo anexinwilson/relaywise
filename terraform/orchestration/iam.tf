@@ -46,12 +46,19 @@ resource "aws_iam_role_policy" "appsync_lambda_policy" {
   name = "appsync-lambda-policy"
   role = aws_iam_role.appsync_lambda_role.id
 
+  # AppSync needs BOTH sides of the permission to invoke a data source:
+  # this identity-based policy on its service role, and a resource-based
+  # aws_lambda_permission on the function. Adding only the second gives a 403
+  # at request time with an "identity-based policy allows" message.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["lambda:InvokeFunction"]
-      Resource = [var.lambda_function_arn]
+      Effect = "Allow"
+      Action = ["lambda:InvokeFunction"]
+      Resource = compact([
+        var.lambda_function_arn,
+        var.integrations_function_arn,
+      ])
     }]
   })
 }

@@ -15,12 +15,8 @@ export default function IntegrationsSection() {
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
           862 Apps. One Conversation.
         </h2>
-        <p className="text-muted-foreground mb-2">
-          Connect the tools you already use
-        </p>
-        <p className="text-sm text-primary font-medium mb-12">
-          Powered by Composio
-        </p>
+        <p className="text-muted-foreground mb-2">Connect the tools you already use</p>
+        <p className="text-sm text-primary font-medium mb-12">Powered by Composio</p>
 
         <div className="grid grid-cols-4 md:grid-cols-6 gap-6 max-w-3xl mx-auto mb-8">
           {popularApps.map((app) => (

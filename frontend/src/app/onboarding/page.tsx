@@ -25,7 +25,9 @@ export default function OnboardingPage() {
 
   const handlePickTemplate = (templateName: string) => {
     setHasCompletedOnboarding(true);
-    router.push(`/dashboard?msg=${encodeURIComponent(`Create ${templateName} automation`)}`);
+    router.push(
+      `/dashboard?msg=${encodeURIComponent(`Create ${templateName} automation`)}`,
+    );
   };
 
   const handleBrowseApps = () => {
@@ -42,7 +44,10 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4" data-testid="onboarding-page">
+    <div
+      className="min-h-screen bg-background flex items-center justify-center p-4"
+      data-testid="onboarding-page"
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -51,11 +56,16 @@ export default function OnboardingPage() {
       >
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-6">
-            <span className="text-white font-bold text-3xl">C</span>
-          </div>
+          <Image
+            src="/relaywise-logo.svg"
+            alt="Relaywise"
+            width={64}
+            height={64}
+            className="rounded-2xl mx-auto mb-6"
+            priority
+          />
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Welcome to Cognive
+            Welcome to Relaywise
           </h1>
           <p className="text-xl text-muted-foreground">
             Let&apos;s connect your first app and start automating
@@ -74,12 +84,8 @@ export default function OnboardingPage() {
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
               <Zap className="w-6 h-6 text-primary" />
             </div>
-            <h2 className="text-xl font-bold text-foreground mb-2">
-              Try a Template
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              See how it works instantly
-            </p>
+            <h2 className="text-xl font-bold text-foreground mb-2">Try a Template</h2>
+            <p className="text-muted-foreground mb-6">See how it works instantly</p>
 
             <div className="space-y-3 mb-6">
               {templates.map((template, i) => (
@@ -115,12 +121,8 @@ export default function OnboardingPage() {
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
               <Plug className="w-6 h-6 text-primary" />
             </div>
-            <h2 className="text-xl font-bold text-foreground mb-2">
-              Connect Your Apps
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Start with the apps you use most
-            </p>
+            <h2 className="text-xl font-bold text-foreground mb-2">Connect Your Apps</h2>
+            <p className="text-muted-foreground mb-6">Start with the apps you use most</p>
 
             <div className="grid grid-cols-4 gap-3 mb-6">
               {popularApps.map((app) => (
@@ -162,9 +164,7 @@ export default function OnboardingPage() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="text-center"
         >
-          <p className="text-muted-foreground mb-4">
-            Or just tell me what you want...
-          </p>
+          <p className="text-muted-foreground mb-4">Or just tell me what you want...</p>
           <form onSubmit={handleChatSubmit} className="max-w-xl mx-auto">
             <div className="relative">
               <Input
@@ -183,7 +183,7 @@ export default function OnboardingPage() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-3">
-              Cognive will ask for the apps it needs
+              Relaywise will ask for the apps it needs
             </p>
           </form>
         </motion.div>

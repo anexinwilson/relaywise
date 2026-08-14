@@ -71,7 +71,10 @@ export function CreditsDisplay({ refreshTrigger }: CreditsDisplayProps) {
     );
   }
 
-  const creditsPercent = Math.min((credits.usedCredits / credits.totalCredits) * 100, 100);
+  const creditsPercent = Math.min(
+    (credits.usedCredits / credits.totalCredits) * 100,
+    100,
+  );
   const isCritical = creditsPercent > 80;
 
   return (
@@ -79,7 +82,12 @@ export function CreditsDisplay({ refreshTrigger }: CreditsDisplayProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Credits</span>
-          <span className={cn("font-semibold tabular-nums", isCritical ? "text-destructive" : "text-foreground")}>
+          <span
+            className={cn(
+              "font-semibold tabular-nums",
+              isCritical ? "text-destructive" : "text-foreground",
+            )}
+          >
             {credits.usedCredits.toFixed(2)}/{credits.totalCredits}
           </span>
         </div>
@@ -87,7 +95,7 @@ export function CreditsDisplay({ refreshTrigger }: CreditsDisplayProps) {
           <div
             className={cn(
               "h-full rounded-full transition-all duration-300",
-              isCritical ? "bg-destructive" : "bg-primary"
+              isCritical ? "bg-destructive" : "bg-primary",
             )}
             style={{ width: `${creditsPercent}%` }}
           />

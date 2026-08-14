@@ -16,20 +16,21 @@ export function DashboardHeader({
   onIntegrationsClick,
   onSettingsClick,
 }: DashboardHeaderProps) {
-
   return (
     <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
       <Link href="/" className="flex items-center gap-2">
         <Image
-          src="/cognive-logo.svg"
-          alt="Cognive"
+          src="/relaywise-logo.svg"
+          alt="Relaywise"
           width={32}
           height={32}
           className="rounded-lg"
         />
-        <span className="text-lg font-bold text-foreground hidden sm:inline">Cognive</span>
+        <span className="text-lg font-bold text-foreground hidden sm:inline">
+          Relaywise
+        </span>
       </Link>
-      
+
       {/* Connected Apps */}
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground hidden md:inline">
@@ -54,14 +55,10 @@ export function DashboardHeader({
           </Button>
         </div>
       </div>
-      
+
       {/* User Menu */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onSettingsClick}
-        >
+        <Button variant="ghost" size="icon" onClick={onSettingsClick}>
           <Settings className="w-5 h-5" />
         </Button>
         <UserButton fallback={<User className="w-4 h-4 text-primary" />} />

@@ -22,21 +22,12 @@ import {
   Check,
 } from "lucide-react";
 import { useAppStore, useConnectedIntegrations } from "@/store/appStore";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function SettingsPage() {
   const router = useRouter();
   const connectedIntegrations = useConnectedIntegrations();
-  const disconnectIntegration = useAppStore(
-    (state) => state.disconnectIntegration
-  );
+  const disconnectIntegration = useAppStore((state) => state.disconnectIntegration);
 
   const [name, setName] = useState("Demo User");
   const [email, setEmail] = useState("demo@example.com");
@@ -91,23 +82,19 @@ export default function SettingsPage() {
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/dashboard")}
-          >
+          <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/cognive-logo.svg"
-              alt="Cognive"
+              src="/relaywise-logo.svg"
+              alt="Relaywise"
               width={32}
               height={32}
               className="rounded-lg"
             />
             <span className="text-lg font-bold text-foreground hidden sm:inline">
-              Cognive
+              Relaywise
             </span>
           </Link>
         </div>
@@ -237,9 +224,7 @@ export default function SettingsPage() {
                           target.src = `https://ui-avatars.com/api/?name=${app.name}&background=374151&color=fff`;
                         }}
                       />
-                      <span className="font-medium text-foreground">
-                        {app.name}
-                      </span>
+                      <span className="font-medium text-foreground">{app.name}</span>
                     </div>
                     <Button
                       variant="ghost"
@@ -286,14 +271,11 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between p-4 bg-background rounded-lg mb-6">
                   <div>
-                    <p className="font-semibold text-foreground">Free Plan</p>
+                    <p className="font-semibold text-foreground">Free</p>
                     <p className="text-sm text-muted-foreground">
-                      Current plan
+                      Relaywise is a personal project. There is no paid plan.
                     </p>
                   </div>
-                  <Button className="gradient-primary hover:opacity-90">
-                    Upgrade to Pro →
-                  </Button>
                 </div>
 
                 {/* Usage Stats */}
@@ -314,14 +296,9 @@ export default function SettingsPage() {
                     <p className="text-2xl font-bold text-foreground">
                       {usage.activeAutomations} / {limits.activeAutomations}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Active Automations
-                    </p>
+                    <p className="text-sm text-muted-foreground">Active Automations</p>
                     <Progress
-                      value={
-                        (usage.activeAutomations / limits.activeAutomations) *
-                        100
-                      }
+                      value={(usage.activeAutomations / limits.activeAutomations) * 100}
                       className="mt-2 h-1"
                     />
                   </div>
@@ -329,9 +306,7 @@ export default function SettingsPage() {
                     <p className="text-2xl font-bold text-foreground">
                       {usage.queries} / {limits.queries}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Queries This Month
-                    </p>
+                    <p className="text-sm text-muted-foreground">Queries This Month</p>
                     <Progress
                       value={(usage.queries / limits.queries) * 100}
                       className="mt-2 h-1"
@@ -341,9 +316,7 @@ export default function SettingsPage() {
                     <p className="text-2xl font-bold text-foreground">
                       {usage.storageUsedMB} / {limits.storageMB} MB
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Storage Used
-                    </p>
+                    <p className="text-sm text-muted-foreground">Storage Used</p>
                     <Progress
                       value={(usage.storageUsedMB / limits.storageMB) * 100}
                       className="mt-2 h-1"
@@ -381,23 +354,9 @@ export default function SettingsPage() {
                         fill="url(#colorCalls)"
                       />
                       <defs>
-                        <linearGradient
-                          id="colorCalls"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#F59E0B"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#F59E0B"
-                            stopOpacity={0}
-                          />
+                        <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                     </AreaChart>
@@ -413,9 +372,7 @@ export default function SettingsPage() {
                   {Object.entries(mcpCallsByIntegration)
                     .sort((a, b) => b[1] - a[1])
                     .map(([app, calls]) => {
-                      const maxCalls = Math.max(
-                        ...Object.values(mcpCallsByIntegration)
-                      );
+                      const maxCalls = Math.max(...Object.values(mcpCallsByIntegration));
                       return (
                         <div key={app} className="flex items-center gap-3">
                           <span className="text-sm text-foreground capitalize w-20">

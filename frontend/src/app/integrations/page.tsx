@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Search, Check, Loader2, ArrowLeft, Plug } from "lucide-react";
 import { useAppStore, useConnectedIntegrations } from "@/store/appStore";
 import appsCatalog from "@/apps_catalog.json";
+import { CONNECT_APP, DISCONNECT_APP, SYNC_CONNECTIONS } from "@/lib/graphql-queries";
+import { useApolloClient } from "@apollo/client/react";
 import { cn } from "@/lib/utils";
 import type { Integration } from "@/types";
 
@@ -39,48 +41,49 @@ export default function IntegrationsPage() {
     () => false,
   );
   const router = useRouter();
+  const apolloClient = useApolloClient();
   const connectedIntegrations = useConnectedIntegrations();
   const connectIntegration = useAppStore((state) => state.connectIntegration);
-  const disconnectIntegration = useAppStore(
-    (state) => state.disconnectIntegration
-  );
+  const disconnectIntegration = useAppStore((state) => state.disconnectIntegration);
 
   useEffect(() => {
     const fetchConnected = async () => {
       try {
-        const res = await fetch("/api/integrations/connected");
-        const data = await res.json();
-        if (data.slugs && Array.isArray(data.slugs)) {
-          data.slugs.forEach((slug: string) => connectIntegration(slug));
-        }
+        // syncConnections reconciles Redis with Composio and returns the
+        // authoritative list, so one call both refreshes and reports.
+        const { data } = await apolloClient.mutate<{
+          syncConnections: { success: boolean; connected: string[] | null };
+        }>({ mutation: SYNC_CONNECTIONS, fetchPolicy: "no-cache" });
+        data?.syncConnections?.connected?.forEach((slug: string) =>
+          connectIntegration(slug),
+        );
       } catch (err) {
         console.error("Failed to fetch connected apps:", err);
       }
     };
-    
+
     fetchConnected();
-    
+
     const handleFocus = () => {
       fetchConnected();
     };
-    
-    window.addEventListener('focus', handleFocus);
-    
+
+    window.addEventListener("focus", handleFocus);
+
     return () => {
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [connectIntegration]);
+  }, [apolloClient, connectIntegration]);
 
   const allApps = formattedApps;
-  const categories = Array.from(new Set(formattedApps.map(app => app.category))).sort();
+  const categories = Array.from(new Set(formattedApps.map((app) => app.category))).sort();
 
   // Filter apps
   const filteredApps = allApps.filter((app) => {
     const matchesSearch =
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      !selectedCategory || app.category === selectedCategory;
+    const matchesCategory = !selectedCategory || app.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -99,22 +102,19 @@ export default function IntegrationsPage() {
     setConnectingId(appId);
 
     try {
-      const res = await fetch("/api/integrations/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: appId }),
+      const { data } = await apolloClient.mutate<{
+        connectApp: { success: boolean; url: string | null; error: string | null };
+      }>({
+        mutation: CONNECT_APP,
+        variables: { slug: appId },
+        fetchPolicy: "no-cache",
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to start connection");
+      const result = data?.connectApp;
+      if (!result?.success || !result.url) {
+        throw new Error(result?.error || "No authorization URL returned");
       }
-
-      const data = await res.json();
-      if (data?.url) {
-        window.open(data.url, "_blank", "noopener,noreferrer");
-      } else {
-        throw new Error("No auth URL returned");
-      }
+      window.open(result.url, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("Connect Error:", err);
       alert("Failed to start connection. Please try again.");
@@ -126,25 +126,28 @@ export default function IntegrationsPage() {
   const handleDisconnect = async (appId: string) => {
     try {
       disconnectIntegration(appId);
-      
-      const res = await fetch("/api/integrations/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: appId }),
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to disconnect");
-      }
 
-      const verifyRes = await fetch("/api/integrations/connected");
-      const data = await verifyRes.json();
-      if (data.slugs && Array.isArray(data.slugs)) {
-        data.slugs.forEach((slug: string) => {
-          if (slug !== appId) connectIntegration(slug);
-        });
+      // Revokes at Composio, then re-syncs and returns what remains, so the
+      // UI never has to guess the resulting state.
+      const { data } = await apolloClient.mutate<{
+        disconnectApp: {
+          success: boolean;
+          connected: string[] | null;
+          error: string | null;
+        };
+      }>({
+        mutation: DISCONNECT_APP,
+        variables: { slug: appId },
+        fetchPolicy: "no-cache",
+      });
+
+      const result = data?.disconnectApp;
+      if (!result?.success) {
+        throw new Error(result?.error || "Failed to disconnect");
       }
-      
+      result.connected?.forEach((slug: string) => {
+        if (slug !== appId) connectIntegration(slug);
+      });
     } catch (err) {
       console.error("Disconnect Error:", err);
       connectIntegration(appId);
@@ -159,7 +162,7 @@ export default function IntegrationsPage() {
     );
   }
 
-  const getFallbackLogo = (name: string) => 
+  const getFallbackLogo = (name: string) =>
     `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1f2937&color=ffffff&size=48&bold=true&format=svg`;
 
   return (
@@ -167,24 +170,20 @@ export default function IntegrationsPage() {
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-          >
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/cognive-logo.svg"
-              alt="Cognive"
+              src="/relaywise-logo.svg"
+              alt="Relaywise"
               width={32}
               height={32}
               className="rounded-lg"
               loading="lazy"
             />
             <span className="text-lg font-bold text-foreground hidden sm:inline">
-              Cognive
+              Relaywise
             </span>
           </Link>
         </div>
@@ -208,9 +207,9 @@ export default function IntegrationsPage() {
             Integrations
           </h1>
           <p className="text-muted-foreground">
-            Connect {allApps.length} apps to Cognive. When you click Connect, we&apos;ll open a new
-            tab to complete the app&apos;s authorization, and your connections will appear here
-            once finished.
+            Connect {allApps.length} apps to Relaywise. When you click Connect, we&apos;ll
+            open a new tab to complete the app&apos;s authorization, and your connections
+            will appear here once finished.
           </p>
         </div>
 
@@ -257,7 +256,9 @@ export default function IntegrationsPage() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate text-base">{app.name}</h3>
+                      <h3 className="font-semibold text-foreground truncate text-base">
+                        {app.name}
+                      </h3>
                     </div>
                   </div>
                   <div className="mt-3">
@@ -283,7 +284,9 @@ export default function IntegrationsPage() {
             onClick={() => setSelectedCategory(null)}
             className={cn(
               "h-9 px-4 rounded-xl transition-all duration-200 border-border/50 hover:border-primary/50",
-              selectedCategory === null ? "gradient-primary text-white border-transparent shadow-sm" : "bg-card/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              selectedCategory === null
+                ? "gradient-primary text-white border-transparent shadow-sm"
+                : "bg-card/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground",
             )}
           >
             All
@@ -296,7 +299,9 @@ export default function IntegrationsPage() {
               onClick={() => setSelectedCategory(cat)}
               className={cn(
                 "h-9 px-4 rounded-xl transition-all duration-200 border-border/50 hover:border-primary/50",
-                selectedCategory === cat ? "gradient-primary text-white border-transparent shadow-sm" : "bg-card/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                selectedCategory === cat
+                  ? "gradient-primary text-white border-transparent shadow-sm"
+                  : "bg-card/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground",
               )}
             >
               {cat}
@@ -308,9 +313,7 @@ export default function IntegrationsPage() {
         <section>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredApps.map((app, i) => {
-              const isConnected = connectedIntegrations.some(
-                (int) => int.id === app.id
-              );
+              const isConnected = connectedIntegrations.some((int) => int.id === app.id);
               const isConnecting = connectingId === app.id;
 
               return (
@@ -323,7 +326,7 @@ export default function IntegrationsPage() {
                     "bg-white/9 border rounded-xl p-4 flex flex-col justify-between h-full",
                     isConnected
                       ? "border-success/30"
-                      : "border-border hover:border-primary/50"
+                      : "border-border hover:border-primary/50",
                   )}
                   data-testid={`integration-card-${app.id}`}
                 >
@@ -399,8 +402,8 @@ export default function IntegrationsPage() {
             <p className="text-muted-foreground mt-1">
               Try searching for something else or clear filters
             </p>
-            <Button 
-              variant="link" 
+            <Button
+              variant="link"
               className="mt-2 text-primary"
               onClick={() => {
                 setSearchQuery("");

@@ -10,12 +10,7 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-export function ChatInput({
-  value,
-  onChange,
-  onSubmit,
-  disabled,
-}: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, disabled }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea to fit content

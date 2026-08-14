@@ -1,9 +1,11 @@
 import { useRef, useEffect } from "react";
+import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, AgentEvent } from "@/types";
 import { MessageButtons } from "./MessageButtons";
+import { MessageText } from "./MessageText";
 import { ThinkingBox } from "./ThinkingBox";
 
 interface ChatAreaProps {
@@ -15,7 +17,14 @@ interface ChatAreaProps {
   thinkingLogs?: AgentEvent[];
 }
 
-export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, thinkingLogs = [] }: ChatAreaProps) {
+export function ChatArea({
+  messages,
+  isTyping,
+  user,
+  onOptionClick,
+  isLoading,
+  thinkingLogs = [],
+}: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,22 +32,25 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, t
   }, [messages]);
 
   return (
-    <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden" id="chat-scroll-container">
+    <div
+      className="flex-1 p-4 overflow-y-auto overflow-x-hidden"
+      id="chat-scroll-container"
+    >
       <div className="max-w-3xl mx-auto space-y-4">
         {isLoading ? (
           <div className="space-y-6 animate-pulse">
-             <div className="flex gap-3 justify-end">
-               <div className="max-w-md rounded-2xl p-4 bg-muted w-64 h-16" />
-               <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
-             </div>
-             <div className="flex gap-3 justify-start">
-               <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
-               <div className="max-w-md rounded-2xl p-4 bg-muted w-72 h-24" />
-             </div>
-             <div className="flex gap-3 justify-end">
-               <div className="max-w-md rounded-2xl p-4 bg-muted w-48 h-12" />
-               <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
-             </div>
+            <div className="flex gap-3 justify-end">
+              <div className="max-w-md rounded-2xl p-4 bg-muted w-64 h-16" />
+              <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
+            </div>
+            <div className="flex gap-3 justify-start">
+              <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
+              <div className="max-w-md rounded-2xl p-4 bg-muted w-72 h-24" />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <div className="max-w-md rounded-2xl p-4 bg-muted w-48 h-12" />
+              <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
+            </div>
           </div>
         ) : messages.length === 0 && !isTyping ? (
           <MessageButtons onOptionClick={onOptionClick} />
@@ -48,66 +60,86 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, t
               const isLastMessage = index === messages.length - 1;
               const isAssistant = message.role === "assistant";
               return (
-              <div key={message.id} className="flex flex-col gap-4">
-                <div
-                  className={cn(
-                    "flex gap-3",
-                    message.role === "user" ? "justify-end" : "justify-start w-full min-w-0"
-                  )}
-                >
-                {message.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0 shrink-0">
-                    <span className="text-white text-sm font-bold">C</span>
+                <div key={message.id} className="flex flex-col gap-4">
+                  <div
+                    className={cn(
+                      "flex gap-3",
+                      message.role === "user"
+                        ? "justify-end"
+                        : "justify-start w-full min-w-0",
+                    )}
+                  >
+                    {message.role === "assistant" && (
+                      // select-none keeps the avatar out of the selection
+                      // range. Without it, dragging across a reply paints the
+                      // selection highlight over the logo, because the image
+                      // sits in the same flex row as the text being selected.
+                      <Image
+                        src="/relaywise-logo.svg"
+                        alt="Relaywise"
+                        width={32}
+                        height={32}
+                        className="rounded-lg flex-shrink-0 shrink-0 select-none"
+                      />
+                    )}
+                    <div
+                      className={cn(
+                        "rounded-2xl p-4 flex-1 min-w-0 flex-shrink",
+                        message.role === "assistant" ? "max-w-2xl" : "max-w-md flex-none",
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card border border-border",
+                      )}
+                    >
+                      {thinkingLogs.length > 0 &&
+                        !isTyping &&
+                        isLastMessage &&
+                        isAssistant && (
+                          <div className="mb-4">
+                            <ThinkingBox logs={thinkingLogs} isComplete={true} />
+                          </div>
+                        )}
+                      <MessageText content={message.content} />
+                      {message.options && message.role === "assistant" && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {message.options.map((option, i) => (
+                            <Button
+                              key={i}
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => onOptionClick(option.value, option.label)}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {message.role === "user" && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src={user?.imageUrl} />
+                        <AvatarFallback>
+                          {user?.firstName?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                )}
-                <div
-                  className={cn(
-                    "rounded-2xl p-4 flex-1 min-w-0 flex-shrink",
-                    message.role === "assistant" ? "max-w-2xl" : "max-w-md flex-none",
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border"
-                  )}
-                >
-                  {thinkingLogs.length > 0 && !isTyping && isLastMessage && isAssistant && (
-                    <div className="mb-4">
-                      <ThinkingBox logs={thinkingLogs} isComplete={true} />
-                    </div>
-                  )}
-                  <p className="text-sm whitespace-pre-line">{message.content}</p>
-                  {message.options && message.role === "assistant" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {message.options.map((option, i) => (
-                        <Button
-                          key={i}
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => onOptionClick(option.value, option.label)}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
                 </div>
-                {message.role === "user" && (
-                  <Avatar className="w-8 h-8 flex-shrink-0">
-                    <AvatarImage src={user?.imageUrl} />
-                    <AvatarFallback>{user?.firstName?.charAt(0) || "U"}</AvatarFallback>
-                  </Avatar>
-                )}
-              </div>
-            </div>
-            )})}
+              );
+            })}
           </>
         )}
-        
+
         {isTyping && (
           <div className="flex gap-3 justify-start w-full min-w-0">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shrink-0">
-              <span className="text-white text-sm font-bold">C</span>
-            </div>
+            <Image
+              src="/relaywise-logo.svg"
+              alt="Relaywise"
+              width={32}
+              height={32}
+              className="rounded-lg shrink-0"
+            />
             {thinkingLogs.length > 0 ? (
               <div className="flex-1 min-w-0 max-w-2xl">
                 <ThinkingBox logs={thinkingLogs} isComplete={false} />
@@ -123,7 +155,7 @@ export function ChatArea({ messages, isTyping, user, onOptionClick, isLoading, t
             )}
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
     </div>

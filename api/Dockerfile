@@ -10,4 +10,4 @@ RUN uv export --frozen --no-dev --no-emit-project --output-file /tmp/requirement
 COPY . ${LAMBDA_TASK_ROOT}/
 
 
-CMD [ "main.handler" ]
+CMD [ "handler.lambda_handler" ]

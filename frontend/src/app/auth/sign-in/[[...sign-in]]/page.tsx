@@ -16,13 +16,13 @@ export default function SignInPage() {
       >
         <Link href="/" className="flex items-center justify-center gap-2 mb-8">
           <Image
-            src="/cognive-logo.svg"
-            alt="Cognive"
+            src="/relaywise-logo.svg"
+            alt="Relaywise"
             width={40}
             height={40}
             className="rounded-xl"
           />
-          <span className="text-2xl font-bold text-foreground">Cognive</span>
+          <span className="text-2xl font-bold text-foreground">Relaywise</span>
         </Link>
 
         <div className="bg-card border border-border rounded-2xl p-8">
@@ -33,14 +33,17 @@ export default function SignInPage() {
                 card: "shadow-none border-0 bg-transparent p-0",
                 headerTitle: "text-foreground text-2xl font-bold mb-2",
                 headerSubtitle: "text-muted-foreground",
-                socialButtonsBlockButton: "border-border hover:bg-card bg-background text-foreground h-12",
+                socialButtonsBlockButton:
+                  "border-border hover:bg-card bg-background text-foreground h-12",
                 socialButtonsBlockButtonText: "text-foreground",
                 formButtonPrimary: "gradient-primary hover:opacity-90 h-12",
                 footerActionLink: "text-primary hover:text-primary/80",
                 formFieldInput: "bg-background border-border text-foreground h-12",
                 formFieldLabel: "text-foreground",
                 dividerLine: "bg-border",
-                dividerText: "text-muted-foreground bg-card",
+                // No background override: Clerk's card is light, and the app's
+                // dark `bg-card` token painted a black box behind this label.
+                dividerText: "text-muted-foreground",
               },
             }}
             routing="path"

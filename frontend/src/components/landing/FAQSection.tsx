@@ -9,39 +9,39 @@ import {
 
 const faqItems = [
   {
-    question: "What is Cognive?",
+    question: "What is Relaywise?",
     answer:
-      "Cognive is where you talk to your apps instead of clicking through them. Connect your tools, Slack, Notion, Gmail, Discord, HubSpot, whatever you use, and just tell Cognive what you want. It pulls data, takes action, and runs automations. All in plain English, no setup screens, no learning curve.",
+      "Relaywise is where you talk to your apps instead of clicking through them. Connect your tools, Slack, Notion, Gmail, Discord, HubSpot, whatever you use, and just tell Relaywise what you want. It pulls data, takes action, and runs automations. All in plain English, no setup screens, no learning curve.",
   },
   {
     question: "What can I actually do with it?",
-    answer: `Chat with your apps. Ask "what customer complaints came in today?" and Cognive pulls answers from Slack, Discord, Intercom, wherever, all at once. No switching tabs, no copy pasting.
+    answer: `Chat with your apps. Ask "what customer complaints came in today?" and Relaywise pulls answers from Slack, Discord, Intercom, wherever, all at once. No switching tabs, no copy pasting.
 
 Instant actions. "Save these to Notion sorted by urgency" or "send this to the support channel." Done immediately, no workflow to build first.
 
-Set up automations. Describe it once: "When someone mentions our product in Discord, check if they are a decision maker and notify me." Cognive figures out the rest and runs it 24/7.
+Set up automations. Describe it once: "When someone mentions our product in Discord, check if they are a decision maker and notify me." Relaywise figures out the rest and runs it 24/7.
 
 Multi step workflows. Monitor something, process it, route it, notify someone. Chain it all together from one conversation.
 
-Confirmation before critical actions. For anything important, Cognive asks before it executes. It does not just run things blindly.`,
+Confirmation before critical actions. For anything important, Relaywise asks before it executes. It does not just run things blindly.`,
   },
   {
-    question: "How many apps does Cognive connect to?",
+    question: "How many apps does Relaywise connect to?",
     answer:
-      "862 apps in Cognive, powered by Composio Managed MCP. If your team uses it, it is probably already there.",
+      "862 apps in Relaywise, powered by Composio Managed MCP. If your team uses it, it is probably already there.",
   },
   {
     question: "How is this different from Zapier, Make, or n8n?",
     answer: `All three make you think like an engineer before you get anything done. Zapier has you clicking through 20 screens. Make has visual nodes that look like a circuit board. n8n is practically a coding tool. All of them dump the cognitive load on you.
 
-Cognive flips that. You describe what you want in plain English and it handles the wiring. No triggers to configure, no fields to map, no logic trees to untangle. Less time figuring out the tool, more time actually getting work done.
+Relaywise flips that. You describe what you want in plain English and it handles the wiring. No triggers to configure, no fields to map, no logic trees to untangle. Less time figuring out the tool, more time actually getting work done.
 
 The other thing none of them can do: ask a live question across multiple apps and get an instant answer. That is a completely different kind of useful.`,
   },
   {
-    question: "Is my data private?",
+    question: "Does it ask before doing things?",
     answer:
-      'Yes, and here is why you can trust that. Requests are authenticated with Clerk, queued through AWS, and processed by an isolated worker. Conversation state is scoped to your account in Postgres, and connected-app credentials remain managed by Composio.\n\nFor critical workflows, Cognive will ask for your confirmation before doing anything. It does not act blindly.',
+      "Yes. For anything important or hard to undo, Relaywise checks with you first rather than running it blindly. Your app passwords and tokens are never stored here, connected-app credentials stay with Composio.",
   },
   {
     question: "Who is this for?",
@@ -51,11 +51,12 @@ The other thing none of them can do: ask a live question across multiple apps an
   {
     question: "How long does setup take?",
     answer:
-      "For a one time action: seconds. For an automation running permanently: under a minute. You describe it, Cognive asks a clarifying question or two, and it is live.",
+      "For a one time action: seconds. For an automation running permanently: under a minute. You describe it, Relaywise asks a clarifying question or two, and it is live.",
   },
   {
     question: "What does it cost?",
-    answer: "$15 a month. That is it.",
+    answer:
+      "Nothing. You get 100 credits a month, and they reset at the start of each month. There is no paid plan and no card to enter.\n\nThe allowance exists so one person cannot run up the model bill for everyone else. A typical request costs a fraction of a credit, so you are unlikely to notice it.",
   },
 ];
 

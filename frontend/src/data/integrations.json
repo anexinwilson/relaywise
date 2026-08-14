@@ -4,7 +4,7 @@
       "id": "discord",
       "name": "Discord",
       "description": "Team communication and communities",
-      "logo": "https://logo.clearbit.com/discord.com",
+      "logo": "/logos/discord.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -12,7 +12,7 @@
       "id": "slack",
       "name": "Slack",
       "description": "Team messaging and collaboration",
-      "logo": "https://logo.clearbit.com/slack.com",
+      "logo": "/logos/slack.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -20,7 +20,7 @@
       "id": "notion",
       "name": "Notion",
       "description": "Notes, docs, and project management",
-      "logo": "https://logo.clearbit.com/notion.so",
+      "logo": "/logos/notion.svg",
       "category": "productivity",
       "supportsRealtime": false
     },
@@ -28,7 +28,7 @@
       "id": "gmail",
       "name": "Gmail",
       "description": "Email communication by Google",
-      "logo": "https://logo.clearbit.com/gmail.com",
+      "logo": "/logos/gmail.svg",
       "category": "email",
       "supportsRealtime": true
     },
@@ -36,7 +36,7 @@
       "id": "linkedin",
       "name": "LinkedIn",
       "description": "Professional networking platform",
-      "logo": "https://logo.clearbit.com/linkedin.com",
+      "logo": "/logos/linkedin.svg",
       "category": "social",
       "supportsRealtime": false
     },
@@ -44,7 +44,7 @@
       "id": "twitter",
       "name": "Twitter/X",
       "description": "Social media and microblogging",
-      "logo": "https://logo.clearbit.com/x.com",
+      "logo": "/logos/twitter.svg",
       "category": "social",
       "supportsRealtime": true
     },
@@ -52,7 +52,7 @@
       "id": "github",
       "name": "GitHub",
       "description": "Code hosting and collaboration",
-      "logo": "https://logo.clearbit.com/github.com",
+      "logo": "/logos/github.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -60,7 +60,7 @@
       "id": "google-calendar",
       "name": "Google Calendar",
       "description": "Calendar and scheduling",
-      "logo": "https://logo.clearbit.com/calendar.google.com",
+      "logo": "/logos/googlecalendar.svg",
       "category": "productivity",
       "supportsRealtime": true
     },
@@ -68,7 +68,7 @@
       "id": "trello",
       "name": "Trello",
       "description": "Visual project management",
-      "logo": "https://logo.clearbit.com/trello.com",
+      "logo": "/logos/trello.svg",
       "category": "productivity",
       "supportsRealtime": false
     },
@@ -76,7 +76,7 @@
       "id": "asana",
       "name": "Asana",
       "description": "Work management platform",
-      "logo": "https://logo.clearbit.com/asana.com",
+      "logo": "/logos/asana.svg",
       "category": "productivity",
       "supportsRealtime": false
     },
@@ -84,7 +84,7 @@
       "id": "telegram",
       "name": "Telegram",
       "description": "Cloud-based messaging",
-      "logo": "https://logo.clearbit.com/telegram.org",
+      "logo": "/logos/telegram.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -92,7 +92,7 @@
       "id": "teams",
       "name": "Microsoft Teams",
       "description": "Business communication platform",
-      "logo": "https://logo.clearbit.com/microsoft.com",
+      "logo": "/logos/microsoft_teams.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -100,7 +100,7 @@
       "id": "todoist",
       "name": "Todoist",
       "description": "Task management app",
-      "logo": "https://logo.clearbit.com/todoist.com",
+      "logo": "/logos/todoist.svg",
       "category": "productivity",
       "supportsRealtime": false
     },
@@ -108,7 +108,7 @@
       "id": "outlook",
       "name": "Outlook",
       "description": "Email and calendar by Microsoft",
-      "logo": "https://logo.clearbit.com/outlook.com",
+      "logo": "/logos/outlook.svg",
       "category": "email",
       "supportsRealtime": true
     },
@@ -116,7 +116,7 @@
       "id": "dropbox",
       "name": "Dropbox",
       "description": "Cloud file storage",
-      "logo": "https://logo.clearbit.com/dropbox.com",
+      "logo": "/logos/dropbox.svg",
       "category": "storage",
       "supportsRealtime": false
     },
@@ -124,7 +124,7 @@
       "id": "google-drive",
       "name": "Google Drive",
       "description": "Cloud storage by Google",
-      "logo": "https://logo.clearbit.com/drive.google.com",
+      "logo": "/logos/googledrive.svg",
       "category": "storage",
       "supportsRealtime": true
     },
@@ -132,7 +132,7 @@
       "id": "airtable",
       "name": "Airtable",
       "description": "Spreadsheet-database hybrid",
-      "logo": "https://logo.clearbit.com/airtable.com",
+      "logo": "/logos/airtable.svg",
       "category": "productivity",
       "supportsRealtime": true
     },
@@ -140,7 +140,7 @@
       "id": "hubspot",
       "name": "HubSpot",
       "description": "CRM and marketing platform",
-      "logo": "https://logo.clearbit.com/hubspot.com",
+      "logo": "/logos/hubspot.svg",
       "category": "crm",
       "supportsRealtime": false
     },
@@ -148,7 +148,7 @@
       "id": "salesforce",
       "name": "Salesforce",
       "description": "Enterprise CRM solution",
-      "logo": "https://logo.clearbit.com/salesforce.com",
+      "logo": "/logos/salesforce.svg",
       "category": "crm",
       "supportsRealtime": false
     },
@@ -156,7 +156,7 @@
       "id": "jira",
       "name": "Jira",
       "description": "Issue and project tracking",
-      "logo": "https://logo.clearbit.com/atlassian.com",
+      "logo": "/logos/jira.svg",
       "category": "developer",
       "supportsRealtime": false
     },
@@ -164,7 +164,7 @@
       "id": "figma",
       "name": "Figma",
       "description": "Collaborative design tool",
-      "logo": "https://logo.clearbit.com/figma.com",
+      "logo": "/logos/figma.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -172,7 +172,7 @@
       "id": "stripe",
       "name": "Stripe",
       "description": "Payment processing",
-      "logo": "https://logo.clearbit.com/stripe.com",
+      "logo": "/logos/stripe.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -180,7 +180,7 @@
       "id": "shopify",
       "name": "Shopify",
       "description": "E-commerce platform",
-      "logo": "https://logo.clearbit.com/shopify.com",
+      "logo": "/logos/shopify.svg",
       "category": "crm",
       "supportsRealtime": true
     },
@@ -188,7 +188,7 @@
       "id": "zoom",
       "name": "Zoom",
       "description": "Video conferencing",
-      "logo": "https://logo.clearbit.com/zoom.us",
+      "logo": "/logos/zoom.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -196,7 +196,7 @@
       "id": "instagram",
       "name": "Instagram",
       "description": "Photo and video sharing",
-      "logo": "https://logo.clearbit.com/instagram.com",
+      "logo": "/logos/instagram.svg",
       "category": "social",
       "supportsRealtime": false
     },
@@ -204,7 +204,7 @@
       "id": "youtube",
       "name": "YouTube",
       "description": "Video hosting platform",
-      "logo": "https://logo.clearbit.com/youtube.com",
+      "logo": "/logos/youtube.svg",
       "category": "social",
       "supportsRealtime": false
     },
@@ -212,7 +212,7 @@
       "id": "mailchimp",
       "name": "Mailchimp",
       "description": "Email marketing platform",
-      "logo": "https://logo.clearbit.com/mailchimp.com",
+      "logo": "/logos/mailchimp.svg",
       "category": "email",
       "supportsRealtime": false
     },
@@ -220,7 +220,7 @@
       "id": "sendgrid",
       "name": "SendGrid",
       "description": "Email delivery service",
-      "logo": "https://logo.clearbit.com/sendgrid.com",
+      "logo": "/logos/sendgrid.svg",
       "category": "email",
       "supportsRealtime": true
     },
@@ -228,7 +228,7 @@
       "id": "zendesk",
       "name": "Zendesk",
       "description": "Customer service platform",
-      "logo": "https://logo.clearbit.com/zendesk.com",
+      "logo": "/logos/zendesk.svg",
       "category": "crm",
       "supportsRealtime": true
     },
@@ -236,7 +236,7 @@
       "id": "intercom",
       "name": "Intercom",
       "description": "Customer messaging platform",
-      "logo": "https://logo.clearbit.com/intercom.com",
+      "logo": "/logos/intercom.svg",
       "category": "crm",
       "supportsRealtime": true
     },
@@ -244,7 +244,7 @@
       "id": "aws-s3",
       "name": "AWS S3",
       "description": "Cloud object storage",
-      "logo": "https://logo.clearbit.com/aws.amazon.com",
+      "logo": "/logos/aws-s3.svg",
       "category": "storage",
       "supportsRealtime": false
     },
@@ -252,7 +252,7 @@
       "id": "mongodb",
       "name": "MongoDB",
       "description": "NoSQL database",
-      "logo": "https://logo.clearbit.com/mongodb.com",
+      "logo": "/logos/mongodb.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -260,7 +260,7 @@
       "id": "vercel",
       "name": "Vercel",
       "description": "Frontend deployment platform",
-      "logo": "https://logo.clearbit.com/vercel.com",
+      "logo": "/logos/vercel.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -268,7 +268,7 @@
       "id": "netlify",
       "name": "Netlify",
       "description": "Web deployment platform",
-      "logo": "https://logo.clearbit.com/netlify.com",
+      "logo": "/logos/netlify.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -276,7 +276,7 @@
       "id": "reddit",
       "name": "Reddit",
       "description": "Social news aggregation",
-      "logo": "https://logo.clearbit.com/reddit.com",
+      "logo": "/logos/reddit.svg",
       "category": "social",
       "supportsRealtime": true
     },
@@ -284,7 +284,7 @@
       "id": "pinterest",
       "name": "Pinterest",
       "description": "Visual discovery platform",
-      "logo": "https://logo.clearbit.com/pinterest.com",
+      "logo": "/logos/pinterest.svg",
       "category": "social",
       "supportsRealtime": false
     },
@@ -292,7 +292,7 @@
       "id": "twilio",
       "name": "Twilio",
       "description": "Communication APIs",
-      "logo": "https://logo.clearbit.com/twilio.com",
+      "logo": "/logos/twilio.svg",
       "category": "communication",
       "supportsRealtime": true
     },
@@ -300,7 +300,7 @@
       "id": "linear",
       "name": "Linear",
       "description": "Modern issue tracking",
-      "logo": "https://logo.clearbit.com/linear.app",
+      "logo": "/logos/linear.svg",
       "category": "developer",
       "supportsRealtime": true
     },
@@ -308,7 +308,7 @@
       "id": "clickup",
       "name": "ClickUp",
       "description": "Productivity platform",
-      "logo": "https://logo.clearbit.com/clickup.com",
+      "logo": "/logos/clickup.svg",
       "category": "productivity",
       "supportsRealtime": true
     },
@@ -316,7 +316,7 @@
       "id": "monday",
       "name": "Monday.com",
       "description": "Work operating system",
-      "logo": "https://logo.clearbit.com/monday.com",
+      "logo": "/logos/monday.svg",
       "category": "productivity",
       "supportsRealtime": true
     }
@@ -330,7 +330,16 @@
     "productivity": {
       "name": "Productivity",
       "icon": "CheckSquare",
-      "apps": ["notion", "google-calendar", "todoist", "trello", "asana", "airtable", "clickup", "monday"]
+      "apps": [
+        "notion",
+        "google-calendar",
+        "todoist",
+        "trello",
+        "asana",
+        "airtable",
+        "clickup",
+        "monday"
+      ]
     },
     "email": {
       "name": "Email",
@@ -345,7 +354,16 @@
     "developer": {
       "name": "Developer Tools",
       "icon": "Code",
-      "apps": ["github", "jira", "figma", "stripe", "mongodb", "vercel", "netlify", "linear"]
+      "apps": [
+        "github",
+        "jira",
+        "figma",
+        "stripe",
+        "mongodb",
+        "vercel",
+        "netlify",
+        "linear"
+      ]
     },
     "storage": {
       "name": "Cloud Storage",

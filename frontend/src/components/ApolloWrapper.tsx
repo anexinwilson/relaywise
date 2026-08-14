@@ -7,13 +7,13 @@ import { createApolloClient } from "@/lib/apollo-client";
 
 export function ApolloWrapper({ children }: { children: ReactNode }) {
   const { getToken } = useAuth();
-  
+
   const client = useMemo(() => {
     return createApolloClient(async () => {
       try {
         return await getToken();
       } catch (error) {
-        console.error('Error getting token:', error);
+        console.error("Error getting token:", error);
         return null;
       }
     });

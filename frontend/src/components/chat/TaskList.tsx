@@ -72,10 +72,12 @@ export function TaskList({
 
   return (
     <aside className="w-64 shrink-0 flex flex-col border-r border-border bg-card">
-
       {/* Header */}
       <div className="p-3 pt-4">
-        <Button className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90" onClick={onNewTask}>
+        <Button
+          className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90"
+          onClick={onNewTask}
+        >
           <Plus className="w-4 h-4" />
           New Task
         </Button>
@@ -86,7 +88,10 @@ export function TaskList({
         <div className="space-y-0.5">
           {isLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <div key={`skeleton-${i}`} className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+              <div
+                key={`skeleton-${i}`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
+              >
                 <div className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse shrink-0" />
                 <div className="h-3.5 bg-muted animate-pulse rounded w-3/4" />
               </div>
@@ -107,7 +112,7 @@ export function TaskList({
                     "flex items-center gap-1.5 px-2 py-2 rounded-lg transition-all duration-150 group",
                     currentTaskId === task.id
                       ? "bg-primary/10 text-foreground"
-                      : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                      : "hover:bg-muted/60 text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {/* Active indicator */}
@@ -116,7 +121,7 @@ export function TaskList({
                       "shrink-0 w-1 h-5 rounded-full transition-all duration-200",
                       currentTaskId === task.id
                         ? "bg-primary"
-                        : "bg-transparent group-hover:bg-border"
+                        : "bg-transparent group-hover:bg-border",
                     )}
                   />
 
@@ -152,7 +157,7 @@ export function TaskList({
 
                 {/* Confirm delete */}
                 {confirmDeleteId === task.id && (
-                  <div className="absolute right-1 top-full mt-1 z-50 w-48 rounded-lg border border-border bg-popover shadow-md p-3">
+                  <div className="absolute inset-x-0 top-full mt-1 z-50 rounded-lg border border-border bg-popover shadow-md p-3">
                     <p className="text-xs text-muted-foreground mb-2.5">
                       Delete this conversation?
                     </p>
@@ -184,7 +189,12 @@ export function TaskList({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Credits</span>
-              <span className={cn("font-semibold tabular-nums", isCritical ? "text-destructive" : "text-foreground")}>
+              <span
+                className={cn(
+                  "font-semibold tabular-nums",
+                  isCritical ? "text-destructive" : "text-foreground",
+                )}
+              >
                 {creditsUsed}/{creditsTotal}
               </span>
             </div>
@@ -192,7 +202,7 @@ export function TaskList({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-300",
-                  isCritical ? "bg-destructive" : "bg-primary"
+                  isCritical ? "bg-destructive" : "bg-primary",
                 )}
                 style={{ width: `${creditsPercent}%` }}
               />
@@ -200,7 +210,6 @@ export function TaskList({
           </div>
         </div>
       )}
-
     </aside>
   );
 }

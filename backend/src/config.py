@@ -1,15 +1,13 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import logging
 import json
 import os
 import boto3
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s][%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# No logging.basicConfig here: it attaches a plain-text handler to the root
+# logger, which in Lambda duplicates every record alongside the Powertools JSON
+# handler and breaks log parsing. Telemetry is owned by observability.telemetry.
+
 
 class Settings(BaseSettings):
     COMPOSIO_API_KEY: str
@@ -30,7 +28,7 @@ class Settings(BaseSettings):
 
 def _secret_values() -> dict:
     """Load deployment secrets in Lambda; local development uses `.env.local`."""
-    secret_id = os.getenv("SECRETS_MANAGER_SECRET_ID", "cognive/lambda/secrets")
+    secret_id = os.getenv("SECRETS_MANAGER_SECRET_ID", "relaywise/lambda/secrets")
     if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
         return {}
     response = boto3.client("secretsmanager", region_name=os.getenv("AWS_REGION", "us-east-1")).get_secret_value(

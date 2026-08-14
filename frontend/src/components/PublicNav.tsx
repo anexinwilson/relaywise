@@ -9,15 +9,13 @@ export function Logo({ showText = true }: { showText?: boolean }) {
   return (
     <Link href="/" className="flex items-center gap-2 group">
       <Image
-        src="/cognive-logo.svg"
-        alt="Cognive"
+        src="/relaywise-logo.svg"
+        alt="Relaywise"
         width={36}
         height={36}
         className="group-hover:glow-primary transition-all rounded-lg"
       />
-      {showText && (
-        <span className="text-xl font-bold text-foreground">Cognive</span>
-      )}
+      {showText && <span className="text-xl font-bold text-foreground">Relaywise</span>}
     </Link>
   );
 }
@@ -40,12 +38,6 @@ export function PublicNav() {
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Integrations
-          </Link>
-          <Link
-            href="/pricing"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Pricing
           </Link>
         </div>
 

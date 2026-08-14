@@ -1,3 +1,9 @@
+# HTTP surface for inbound third-party webhooks only.
+#
+# Everything the browser calls goes through AppSync, which already has the Clerk
+# authorizer attached. Composio's servers cannot present a Clerk JWT and post
+# their own JSON shape, so they need a plain HTTP endpoint.
+
 resource "aws_apigatewayv2_api" "webhooks" {
   count         = var.deployment_phase == "complete" ? 1 : 0
   name          = "relaywise-webhooks"
@@ -8,7 +14,7 @@ resource "aws_apigatewayv2_integration" "webhooks" {
   count                  = var.deployment_phase == "complete" ? 1 : 0
   api_id                 = aws_apigatewayv2_api.webhooks[0].id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.cognive_lambda[0].invoke_arn
+  integration_uri        = aws_lambda_function.api[0].invoke_arn
   payload_format_version = "2.0"
 }
 
@@ -30,7 +36,7 @@ resource "aws_lambda_permission" "webhook_api" {
   count         = var.deployment_phase == "complete" ? 1 : 0
   statement_id  = "AllowWebhookApiInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.cognive_lambda[0].function_name
+  function_name = aws_lambda_function.api[0].function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.webhooks[0].execution_arn}/*/*"
 }

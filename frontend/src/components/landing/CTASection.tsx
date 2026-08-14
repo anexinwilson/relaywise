@@ -11,7 +11,7 @@ export default function CTASection() {
           Ready to try?
         </h2>
         <p className="text-muted-foreground mb-8">
-          No credit card. Cancel anytime.
+          Sign in and start talking to your apps.
         </p>
         <Link href="/auth/sign-up">
           <Button

@@ -23,3 +23,10 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
 ]
+
+[tool.pytest.ini_options]
+# `app` and `authorizer` live at the project root, not in a src/ layout, so the
+# root has to be importable for the tests to find them. Without this every run
+# needs PYTHONPATH=. in front of it.
+pythonpath = ["."]
+testpaths = ["__tests__"]

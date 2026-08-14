@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0"
+  required_version = "~> 1.15"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -10,4 +10,12 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project   = "relaywise"
+      Stack     = "orchestration"
+      ManagedBy = "terraform"
+    }
+  }
 }

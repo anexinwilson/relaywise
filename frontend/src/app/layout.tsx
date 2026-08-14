@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cognive - Chat With Your Apps. Automate Anything.",
+  title: "Relaywise - Chat With Your Apps. Automate Anything.",
   description:
     "MCP-powered. 500+ integrations. Ask anything, do anything. Automate it all — in plain English.",
 };

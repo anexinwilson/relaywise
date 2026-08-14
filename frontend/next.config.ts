@@ -6,23 +6,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "logo.clearbit.com",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
         hostname: "ui-avatars.com",
         pathname: "/api/**",
-      },
-      {
-        protocol: "https",
-        hostname: "logos.composio.dev",
-        pathname: "/api/**",
-      },
-      {
-        protocol: "https",
-        hostname: "ticktick.com",
-        pathname: "/**",
       },
     ],
   },

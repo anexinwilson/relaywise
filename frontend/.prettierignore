@@ -1,0 +1,5 @@
+.next
+node_modules
+public/logos
+src/apps_catalog.json
+package-lock.json

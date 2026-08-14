@@ -11,11 +11,13 @@ interface CatalogIntegration {
   category: string;
 }
 
-const formattedIntegrations: Integration[] = (appsCatalog as CatalogIntegration[]).map((app) => ({
-  ...app,
-  id: app.slug,
-  supportsRealtime: false,
-}));
+const formattedIntegrations: Integration[] = (appsCatalog as CatalogIntegration[]).map(
+  (app) => ({
+    ...app,
+    id: app.slug,
+    supportsRealtime: false,
+  }),
+);
 
 // Conversation state for step-by-step chat flows
 interface ConversationState {
@@ -29,10 +31,7 @@ interface AppState {
   // UI State
   showIntegrationModal: boolean;
   selectedIntegration: Integration | null;
-  setShowIntegrationModal: (
-    show: boolean,
-    integration?: Integration | null
-  ) => void;
+  setShowIntegrationModal: (show: boolean, integration?: Integration | null) => void;
 
   // Current selections
   currentTaskId: string | null;
@@ -144,20 +143,22 @@ export const useAppStore = create<AppState>()(
         })),
       updateConversation: (id, updates) =>
         set((state) => ({
-          conversations: sortByLastModified(state.conversations.map((conv) =>
-            conv.id === id ? { ...conv, ...updates } : conv
-          )),
+          conversations: sortByLastModified(
+            state.conversations.map((conv) =>
+              conv.id === id ? { ...conv, ...updates } : conv,
+            ),
+          ),
         })),
       updateConversationId: (oldId, newId) =>
         set((state) => ({
           conversations: state.conversations.map((conv) =>
-            conv.id === oldId ? { ...conv, id: newId } : conv
+            conv.id === oldId ? { ...conv, id: newId } : conv,
           ),
         })),
       updateConversationName: (id, name) =>
         set((state) => ({
           conversations: state.conversations.map((conv) =>
-            conv.id === id ? { ...conv, name } : conv
+            conv.id === id ? { ...conv, name } : conv,
           ),
         })),
       addMessageToConversation: (id, message) =>
@@ -165,7 +166,7 @@ export const useAppStore = create<AppState>()(
           conversations: state.conversations.map((conv) =>
             conv.id === id
               ? { ...conv, chatHistory: [...conv.chatHistory, message] }
-              : conv
+              : conv,
           ),
         })),
 
@@ -175,23 +176,18 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           conversationState: { ...state.conversationState, ...newState },
         })),
-      resetConversationState: () =>
-        set({ conversationState: initialConversationState }),
+      resetConversationState: () => set({ conversationState: initialConversationState }),
 
       // Integrations
       allIntegrations: formattedIntegrations,
       connectedIntegrationIds: [],
       connectIntegration: (id) =>
         set((state) => ({
-          connectedIntegrationIds: [
-            ...new Set([...state.connectedIntegrationIds, id]),
-          ],
+          connectedIntegrationIds: [...new Set([...state.connectedIntegrationIds, id])],
         })),
       disconnectIntegration: (id) =>
         set((state) => ({
-          connectedIntegrationIds: state.connectedIntegrationIds.filter(
-            (i) => i !== id
-          ),
+          connectedIntegrationIds: state.connectedIntegrationIds.filter((i) => i !== id),
         })),
       isIntegrationConnected: (id) => get().connectedIntegrationIds.includes(id),
 
@@ -212,71 +208,78 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ creditsRefreshTrigger: state.creditsRefreshTrigger + 1 })),
     }),
     {
-      name: "cognive-storage",
+      name: "relaywise-storage",
       partialize: (state) => ({
         connectedIntegrationIds: state.connectedIntegrationIds,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         conversations: state.conversations, // <- Enable localStorage persistence
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Selectors
-export const useConversationState = () =>
-  useAppStore((state) => state.conversationState);
+export const useConversationState = () => useAppStore((state) => state.conversationState);
 export const useConversations = () => useAppStore((state) => state.conversations);
 export const usePendingMessages = () => useAppStore((state) => state.pendingMessages);
 export const useCurrentConversation = () => {
   const conversations = useAppStore((state) => state.conversations);
   const currentTaskId = useAppStore((state) => state.currentTaskId);
   const pendingMessages = useAppStore((state) => state.pendingMessages);
-  
+
   if (!currentTaskId) {
     // No task selected - show pending messages if any
     if (pendingMessages.length > 0) {
       return {
-        id: 'pending',
-        name: 'New Chat',
-        status: 'running' as const,
-        type: 'automation' as const,
+        id: "pending",
+        name: "New Chat",
+        status: "running" as const,
+        type: "automation" as const,
         lastModifiedAt: new Date().toISOString(),
-        lastRun: '',
+        lastRun: "",
         connectedApps: [],
-        description: 'New Chat',
+        description: "New Chat",
         chatHistory: pendingMessages,
-        compiledWorkflow: { trigger: { type: 'polling' as const, interval: '', app: '' }, steps: [], errorHandling: {} },
+        compiledWorkflow: {
+          trigger: { type: "polling" as const, interval: "", app: "" },
+          steps: [],
+          errorHandling: {},
+        },
         stats: { totalRuns: 0 },
       };
     }
     return null;
   }
-  
+
   // Task selected - try to find it
   const existingConversation = conversations.find((conv) => conv.id === currentTaskId);
-  
+
   if (existingConversation) {
     return existingConversation;
   }
-  
+
   // Task ID set but conversation doesn't exist yet (waiting for subscription)
   // Show pending messages with the real sessionId
   if (pendingMessages.length > 0) {
     return {
       id: currentTaskId,
-      name: 'New Chat',
-      status: 'running' as const,
-      type: 'automation' as const,
+      name: "New Chat",
+      status: "running" as const,
+      type: "automation" as const,
       lastModifiedAt: new Date().toISOString(),
-      lastRun: '',
+      lastRun: "",
       connectedApps: [],
-      description: 'New Chat',
+      description: "New Chat",
       chatHistory: pendingMessages,
-      compiledWorkflow: { trigger: { type: 'polling' as const, interval: '', app: '' }, steps: [], errorHandling: {} },
+      compiledWorkflow: {
+        trigger: { type: "polling" as const, interval: "", app: "" },
+        steps: [],
+        errorHandling: {},
+      },
       stats: { totalRuns: 0 },
     };
   }
-  
+
   return null;
 };
 export const useConnectedIntegrations = () => {
@@ -284,4 +287,3 @@ export const useConnectedIntegrations = () => {
   const connectedIds = useAppStore((state) => state.connectedIntegrationIds);
   return allIntegrations.filter((i) => connectedIds.includes(i.id));
 };
-

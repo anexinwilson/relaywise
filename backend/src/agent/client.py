@@ -1,4 +1,3 @@
-import boto3
 from concurrent.futures import ThreadPoolExecutor
 from composio import Composio
 from upstash_redis import Redis

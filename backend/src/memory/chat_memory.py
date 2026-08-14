@@ -17,23 +17,6 @@ class ChatMemory:
             conversation = ConversationRepository(session).get(actor_id, session_id)
             return conversation.chat_name if conversation else None
 
-    def store_message(
-        self,
-        actor_id: str,
-        session_id: str,
-        message: str,
-        role: str,
-        is_chat_name: bool = False,
-        event_type: str | None = None,
-    ) -> None:
-        del role, event_type
-        with self.session_factory() as session:
-            ConversationRepository(session).upsert(
-                actor_id,
-                session_id,
-                chat_name=message if is_chat_name else None,
-            )
-
     def save_chat_name(self, actor_id: str, session_id: str, chat_name: str | None) -> None:
         with self.session_factory() as session:
             ConversationRepository(session).upsert(actor_id, session_id, chat_name=chat_name)
@@ -45,13 +28,6 @@ class ChatMemory:
             repository = ConversationRepository(session)
             repository.upsert(actor_id, session_id)
             repository.add_message(actor_id, session_id, role, message)
-
-    def get_original_request(self, actor_id: str, session_id: str) -> None:
-        del actor_id, session_id
-        return None
-
-    def is_first_message(self, actor_id: str, session_id: str) -> bool:
-        return self.get_chat_name(actor_id, session_id) is None
 
     def get_chat_names(self, actor_id: str, max_results: int = 50) -> list[dict]:
         with self.session_factory() as session:

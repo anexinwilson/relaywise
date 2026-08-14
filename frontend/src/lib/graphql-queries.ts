@@ -92,3 +92,37 @@ export const GET_CONVERSATION_MESSAGES = gql`
     }
   }
 `;
+
+// --- Connected-app control plane --------------------------------------------
+// Replaces the COMPOSIO_CONTROL_URL REST calls. Identity comes from the Clerk
+// authorizer's resolver context, so the client no longer sends its own userId.
+
+export const CONNECT_APP = gql`
+  mutation ConnectApp($slug: String!) {
+    connectApp(slug: $slug) {
+      success
+      url
+      error
+    }
+  }
+`;
+
+export const SYNC_CONNECTIONS = gql`
+  mutation SyncConnections {
+    syncConnections {
+      success
+      connected
+      error
+    }
+  }
+`;
+
+export const DISCONNECT_APP = gql`
+  mutation DisconnectApp($slug: String!) {
+    disconnectApp(slug: $slug) {
+      success
+      connected
+      error
+    }
+  }
+`;

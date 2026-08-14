@@ -1,6 +1,20 @@
+locals {
+  # Visibility must exceed the worker timeout, or a slow run can be redelivered
+  # while the first attempt is still executing.
+  worker_timeout_seconds   = 300
+  queue_visibility_seconds = 360
+  # Per image type, not in total.
+  retained_container_images = 5
+}
+
+# --- Container registry ------------------------------------------------------
+
 resource "aws_ecr_repository" "lambda_repo" {
-  name                 = "cognive-lambda-repo"
-  image_tag_mutability = "MUTABLE"
+  name = "relaywise-lambda-repo"
+
+  # Deploys are digest-pinned, so tags never need to be overwritten. IMMUTABLE
+  # makes that policy structural rather than a convention.
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
@@ -14,19 +28,41 @@ resource "aws_ecr_repository" "lambda_repo" {
 resource "aws_ecr_lifecycle_policy" "lambda_repo" {
   repository = aws_ecr_repository.lambda_repo.name
 
+  # One repository holds three different images, distinguished by tag prefix.
+  # A single "keep N most recent" rule counts them together, so a run of worker
+  # pushes silently expired the api and authorizer images and their Lambdas
+  # could no longer start. Retention has to be per image type.
   policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep the ten most recent Cognive Lambda images"
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
-      }
-      action = { type = "expire" }
-    }]
+    rules = concat(
+      [
+        for index, prefix in ["api", "authorizer", "worker"] : {
+          rulePriority = index + 1
+          description  = "Keep the ${local.retained_container_images} most recent ${prefix} images"
+          selection = {
+            tagStatus     = "tagged"
+            tagPrefixList = ["${prefix}-"]
+            countType     = "imageCountMoreThan"
+            countNumber   = local.retained_container_images
+          }
+          action = { type = "expire" }
+        }
+      ],
+      [{
+        rulePriority = 10
+        description  = "Expire untagged layers left behind by a failed push"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
+      }]
+    )
   })
 }
+
+# --- Task queue --------------------------------------------------------------
 
 resource "aws_sqs_queue" "agent_tasks_dlq" {
   name                      = "relaywise-agent-tasks-dlq.fifo"
@@ -35,11 +71,15 @@ resource "aws_sqs_queue" "agent_tasks_dlq" {
 }
 
 resource "aws_sqs_queue" "agent_tasks" {
-  name                        = "relaywise-agent-tasks.fifo"
-  fifo_queue                  = true
+  name       = "relaywise-agent-tasks.fifo"
+  fifo_queue = true
+
+  # Deduplication is explicit per message: two identical prompts in the same
+  # conversation are legitimate and must not be collapsed.
   content_based_deduplication = false
-  visibility_timeout_seconds  = 900
-  message_retention_seconds   = 345600
+
+  visibility_timeout_seconds = local.queue_visibility_seconds
+  message_retention_seconds  = 345600
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.agent_tasks_dlq.arn
@@ -47,53 +87,32 @@ resource "aws_sqs_queue" "agent_tasks" {
   })
 }
 
-resource "aws_cloudwatch_log_group" "authorizer_logs" {
-  name              = "/aws/lambda/cognive-authorizer"
+# --- Log groups --------------------------------------------------------------
+# Declared explicitly so retention is set; Lambda would otherwise create them
+# with never-expire retention on first invocation.
+
+resource "aws_cloudwatch_log_group" "api" {
+  name              = "/aws/lambda/relaywise-api"
   retention_in_days = 7
 }
 
-resource "aws_cloudwatch_log_group" "cognive_lambda_logs" {
-  name              = "/aws/lambda/cognive-lambda"
+resource "aws_cloudwatch_log_group" "authorizer" {
+  name              = "/aws/lambda/relaywise-authorizer"
   retention_in_days = 7
 }
 
-resource "aws_lambda_function" "authorizer" {
-  count         = var.deployment_phase == "complete" ? 1 : 0
-  function_name = "cognive-authorizer"
-  role          = aws_iam_role.authorizer_role.arn
-  timeout       = 30
-
-  image_uri    = var.authorizer_image_uri
-  package_type = "Image"
-
-  logging_config {
-    log_group  = aws_cloudwatch_log_group.authorizer_logs.name
-    log_format = "JSON"
-  }
-
-  depends_on = [
-    aws_cloudwatch_log_group.authorizer_logs,
-    aws_iam_role_policy_attachment.authorizer_basic,
-  ]
-
-  lifecycle {
-    precondition {
-      condition     = var.authorizer_image_uri != null && can(regex("@sha256:[0-9a-f]{64}$", var.authorizer_image_uri))
-      error_message = "authorizer_image_uri must be a digest-pinned ECR URI when deployment_phase is complete."
-    }
-  }
-}
-
-resource "aws_cloudwatch_log_group" "worker_logs" {
+resource "aws_cloudwatch_log_group" "worker" {
   name              = "/aws/lambda/relaywise-agent-worker"
   retention_in_days = 7
 }
 
-resource "aws_lambda_function" "cognive_lambda" {
+# --- Functions ---------------------------------------------------------------
+
+resource "aws_lambda_function" "api" {
   count         = var.deployment_phase == "complete" ? 1 : 0
-  function_name = "cognive-lambda"
-  role          = aws_iam_role.lambda_role.arn
-  timeout       = 120
+  function_name = "relaywise-api"
+  role          = aws_iam_role.api.arn
+  timeout       = 30 # AppSync gives up at 30s; no point outliving the caller
   memory_size   = 512
 
   image_uri    = var.lambda_image_uri
@@ -102,18 +121,19 @@ resource "aws_lambda_function" "cognive_lambda" {
   environment {
     variables = {
       SECRETS_MANAGER_SECRET_ID = aws_secretsmanager_secret.app_secrets.name
-      COMPOSIO_CACHE_DIR       = "/tmp/composio"
+      CORS_ALLOWED_ORIGINS      = var.cors_allowed_origins
     }
   }
 
   logging_config {
-    log_group  = aws_cloudwatch_log_group.cognive_lambda_logs.name
+    log_group  = aws_cloudwatch_log_group.api.name
     log_format = "JSON"
   }
 
   depends_on = [
-    aws_cloudwatch_log_group.cognive_lambda_logs,
-    aws_iam_role_policy_attachment.lambda_basic,
+    aws_cloudwatch_log_group.api,
+    aws_iam_role_policy_attachment.api_basic,
+    aws_iam_role_policy.api_runtime,
   ]
 
   lifecycle {
@@ -124,32 +144,71 @@ resource "aws_lambda_function" "cognive_lambda" {
   }
 }
 
-resource "aws_lambda_function" "agent_worker" {
+resource "aws_lambda_function" "authorizer" {
   count         = var.deployment_phase == "complete" ? 1 : 0
-  function_name = "relaywise-agent-worker"
-  role          = aws_iam_role.lambda_role.arn
-  timeout       = 900
-  memory_size   = 1024
-  image_uri     = var.worker_image_uri
-  package_type  = "Image"
+  function_name = "relaywise-authorizer"
+  role          = aws_iam_role.authorizer.arn
+  timeout       = 10
+
+  image_uri    = var.authorizer_image_uri
+  package_type = "Image"
 
   environment {
     variables = {
       SECRETS_MANAGER_SECRET_ID = aws_secretsmanager_secret.app_secrets.name
-      COMPOSIO_CACHE_DIR       = "/tmp/composio"
     }
   }
 
   logging_config {
-    log_group  = aws_cloudwatch_log_group.worker_logs.name
+    log_group  = aws_cloudwatch_log_group.authorizer.name
     log_format = "JSON"
   }
 
   depends_on = [
-    aws_cloudwatch_log_group.worker_logs,
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy.worker_runtime_policy,
-    aws_iam_role_policy.lambda_ecr_policy,
+    aws_cloudwatch_log_group.authorizer,
+    aws_iam_role_policy_attachment.authorizer_basic,
+    aws_iam_role_policy.authorizer_secrets,
+  ]
+
+  lifecycle {
+    precondition {
+      condition     = var.authorizer_image_uri != null && can(regex("@sha256:[0-9a-f]{64}$", var.authorizer_image_uri))
+      error_message = "authorizer_image_uri must be a digest-pinned ECR URI when deployment_phase is complete."
+    }
+  }
+}
+
+resource "aws_lambda_function" "agent_worker" {
+  count         = var.deployment_phase == "complete" ? 1 : 0
+  function_name = "relaywise-agent-worker"
+  role          = aws_iam_role.worker.arn
+  timeout       = local.worker_timeout_seconds
+
+  # Lambda caps the init phase at 10s regardless of function timeout, and
+  # importing LangGraph + Composio exceeded it at 1024 MB. Memory buys CPU
+  # here: the task only peaks at ~291 MB. Roughly cost-neutral, since billing
+  # is GB-ms and the extra CPU removes a full duplicate init per cold start.
+  memory_size = 2048
+
+  image_uri    = var.worker_image_uri
+  package_type = "Image"
+
+  environment {
+    variables = {
+      SECRETS_MANAGER_SECRET_ID = aws_secretsmanager_secret.app_secrets.name
+      COMPOSIO_CACHE_DIR        = "/tmp/composio"
+    }
+  }
+
+  logging_config {
+    log_group  = aws_cloudwatch_log_group.worker.name
+    log_format = "JSON"
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.worker,
+    aws_iam_role_policy_attachment.worker_basic,
+    aws_iam_role_policy.worker_runtime,
   ]
 
   lifecycle {
@@ -166,5 +225,58 @@ resource "aws_lambda_event_source_mapping" "agent_tasks" {
   function_name           = aws_lambda_function.agent_worker[0].arn
   batch_size              = 1
   function_response_types = ["ReportBatchItemFailures"]
-  scaling_config { maximum_concurrency = 2 }
+
+  scaling_config {
+    maximum_concurrency = var.worker_max_concurrency
+  }
+}
+
+# --- Connected-app control plane ---------------------------------------------
+# Built from the *worker* image with an overridden entrypoint. Same artefact,
+# different CMD: the Composio SDK stays out of the API Lambda that serves
+# conversation queries, and there is no third image to build.
+
+resource "aws_cloudwatch_log_group" "integrations" {
+  name              = "/aws/lambda/relaywise-integrations"
+  retention_in_days = 7
+}
+
+resource "aws_lambda_function" "integrations" {
+  count         = var.deployment_phase == "complete" ? 1 : 0
+  function_name = "relaywise-integrations"
+  role          = aws_iam_role.integrations.arn
+  timeout       = 30 # AppSync gives up at 30s
+  memory_size   = 1024
+
+  image_uri    = var.worker_image_uri
+  package_type = "Image"
+
+  image_config {
+    command = ["integrations.handler.handler"]
+  }
+
+  environment {
+    variables = {
+      SECRETS_MANAGER_SECRET_ID = aws_secretsmanager_secret.app_secrets.name
+      COMPOSIO_CACHE_DIR        = "/tmp/composio"
+    }
+  }
+
+  logging_config {
+    log_group  = aws_cloudwatch_log_group.integrations.name
+    log_format = "JSON"
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.integrations,
+    aws_iam_role_policy_attachment.integrations_basic,
+    aws_iam_role_policy.integrations_runtime,
+  ]
+
+  lifecycle {
+    precondition {
+      condition     = var.worker_image_uri != null && can(regex("@sha256:[0-9a-f]{64}$", var.worker_image_uri))
+      error_message = "worker_image_uri must be a digest-pinned ECR URI when deployment_phase is complete."
+    }
+  }
 }

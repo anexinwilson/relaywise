@@ -1,5 +1,5 @@
 resource "aws_appsync_graphql_api" "main" {
-  name                = "cognive-appsync"
+  name                = "relaywise-appsync"
   authentication_type = "AWS_LAMBDA"
   lambda_authorizer_config {
     authorizer_uri                   = var.authorizer_function_arn
@@ -22,8 +22,23 @@ type Mutation {
   publishTaskComplete(input: TaskCompleteInput!): TaskComplete
     @aws_api_key
   deleteConversation(sessionId: String!): DeleteResponse
+  connectApp(slug: String!): ConnectResponse
+  syncConnections: SyncResponse
+  disconnectApp(slug: String!): SyncResponse
   broadcastAgentEvent(taskId: String!, category: String!, message: String!): AgentEvent
     @aws_api_key
+}
+
+type ConnectResponse {
+  success: Boolean!
+  url: String
+  error: String
+}
+
+type SyncResponse {
+  success: Boolean!
+  connected: [String]
+  error: String
 }
 
 type DeleteResponse {
@@ -104,8 +119,6 @@ EOF
   }
 }
 
-data "aws_caller_identity" "current" {}
-
 resource "aws_appsync_api_key" "main" {
   api_id  = aws_appsync_graphql_api.main.id
   expires = var.appsync_api_key_expires
@@ -122,6 +135,17 @@ resource "aws_appsync_datasource" "lambda" {
 }
 
 # CRITICAL: NONE datasource required for subscriptions to receive data
+resource "aws_appsync_datasource" "integrations" {
+  count            = var.integrations_function_arn == null ? 0 : 1
+  api_id           = aws_appsync_graphql_api.main.id
+  name             = "IntegrationsDataSource"
+  type             = "AWS_LAMBDA"
+  service_role_arn = aws_iam_role.appsync_lambda_role.arn
+  lambda_config {
+    function_arn = var.integrations_function_arn
+  }
+}
+
 resource "aws_appsync_datasource" "local" {
   api_id = aws_appsync_graphql_api.main.id
   name   = "LocalDataSource"
@@ -133,6 +157,8 @@ resource "aws_lambda_permission" "appsync_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = var.lambda_function_arn
   principal     = "appsync.amazonaws.com"
+  # Without source_arn any AppSync API in any account could invoke this function.
+  source_arn = "${aws_appsync_graphql_api.main.arn}/*"
 }
 
 resource "aws_lambda_permission" "appsync_authorizer_invoke" {
@@ -140,6 +166,7 @@ resource "aws_lambda_permission" "appsync_authorizer_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = var.authorizer_function_arn
   principal     = "appsync.amazonaws.com"
+  source_arn    = aws_appsync_graphql_api.main.arn
 }
 
 resource "aws_appsync_resolver" "ask_agent" {
@@ -354,4 +381,99 @@ export function response(ctx) {
   return ctx.result;
 }
 EOF
+}
+
+# --- Connected-app control plane --------------------------------------------
+
+resource "aws_appsync_resolver" "connect_app" {
+  count       = var.integrations_function_arn == null ? 0 : 1
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Mutation"
+  field       = "connectApp"
+  data_source = aws_appsync_datasource.integrations[0].name
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  code = <<-EOF
+export function request(ctx) {
+  return {
+    operation: 'Invoke',
+    payload: {
+      info: { fieldName: ctx.info.fieldName },
+      arguments: ctx.args,
+      identity: ctx.identity
+    }
+  };
+}
+export function response(ctx) {
+  if (ctx.error) return util.appendError(ctx.error.message, ctx.error.type);
+  return ctx.result;
+}
+EOF
+}
+
+resource "aws_appsync_resolver" "sync_connections" {
+  count       = var.integrations_function_arn == null ? 0 : 1
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Mutation"
+  field       = "syncConnections"
+  data_source = aws_appsync_datasource.integrations[0].name
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  code = <<-EOF
+export function request(ctx) {
+  return {
+    operation: 'Invoke',
+    payload: {
+      info: { fieldName: ctx.info.fieldName },
+      arguments: ctx.args,
+      identity: ctx.identity
+    }
+  };
+}
+export function response(ctx) {
+  if (ctx.error) return util.appendError(ctx.error.message, ctx.error.type);
+  return ctx.result;
+}
+EOF
+}
+
+resource "aws_appsync_resolver" "disconnect_app" {
+  count       = var.integrations_function_arn == null ? 0 : 1
+  api_id      = aws_appsync_graphql_api.main.id
+  type        = "Mutation"
+  field       = "disconnectApp"
+  data_source = aws_appsync_datasource.integrations[0].name
+  runtime {
+    name            = "APPSYNC_JS"
+    runtime_version = "1.0.0"
+  }
+  code = <<-EOF
+export function request(ctx) {
+  return {
+    operation: 'Invoke',
+    payload: {
+      info: { fieldName: ctx.info.fieldName },
+      arguments: ctx.args,
+      identity: ctx.identity
+    }
+  };
+}
+export function response(ctx) {
+  if (ctx.error) return util.appendError(ctx.error.message, ctx.error.type);
+  return ctx.result;
+}
+EOF
+}
+
+resource "aws_lambda_permission" "appsync_integrations_invoke" {
+  count         = var.integrations_function_arn == null ? 0 : 1
+  statement_id  = "AllowAppSyncIntegrationsInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.integrations_function_arn
+  principal     = "appsync.amazonaws.com"
+  source_arn    = "${aws_appsync_graphql_api.main.arn}/*"
 }
