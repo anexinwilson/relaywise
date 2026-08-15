@@ -93,5 +93,5 @@ variable "cors_allowed_origins" {
     Both the deployed frontend and local development are listed, so neither
     needs changing when the other is worked on.
   EOT
-  default     = "http://localhost:3000,https://relaywise-ebon.vercel.app"
+  default     = "http://localhost:3000,https://relaywise-seven.vercel.app"
 }

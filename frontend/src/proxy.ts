@@ -31,8 +31,12 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  // Skip Next internals and static files. Kept simple on purpose: Turbopack
-  // handled complex matcher patterns differently from webpack before 16.3.0,
-  // which produced a routing manifest Vercel served as a sitewide 404.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Clerk's documented matcher: everything except Next internals and anything
+  // that looks like a static file. Without the extension list, every asset in
+  // public/ is routed through the proxy and answered as though it were a
+  // protected page, so images 404 on a signed-out request.
+  matcher: [
+    "/((?!_next|[^?]*\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+  ],
 };
