@@ -1,0 +1,42 @@
+name: terraform
+
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: formatting
+        run: terraform fmt -check -recursive
+
+      # -backend=false so this never touches real state and needs no AWS
+      # credentials. Nothing in CI can reach the infrastructure.
+      - name: validate each stack
+        run: |
+          for stack in terraform/*/; do
+            [ -f "$stack/main.tf" ] || continue
+            echo "== $stack"
+            terraform -chdir="$stack" init -backend=false -input=false
+            terraform -chdir="$stack" validate
+          done

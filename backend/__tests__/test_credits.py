@@ -217,3 +217,20 @@ def test_reset_label_matches_the_key_the_balance_rolls_over_on() -> None:
     assert current_period(now) == "2026-08"
     assert current_period(next_reset(now)) == "2026-09"
     assert next_reset_label(now) == "1 September 2026"
+
+
+def test_ttl_outlives_the_longest_month() -> None:
+    """A key must not expire while its own period is still current.
+
+    The worst case is a key created in the first moment of a 31 day month. Any
+    shorter TTL expires a live balance mid-month, which silently grants a
+    second allowance.
+    """
+    from credits.period import KEY_TTL_SECONDS
+
+    longest_month = 31 * 24 * 60 * 60
+    assert KEY_TTL_SECONDS >= longest_month
+
+    # And no longer than it needs to be: the month in the key name drives the
+    # reset, so extra days only leave dead keys in Redis.
+    assert KEY_TTL_SECONDS == longest_month

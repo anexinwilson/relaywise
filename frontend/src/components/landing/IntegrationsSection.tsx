@@ -13,7 +13,7 @@ export default function IntegrationsSection() {
     <section className="py-20 px-6" data-testid="integrations-section">
       <div className="container mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          862 Apps. One Conversation.
+          860+ Apps. One Conversation.
         </h2>
         <p className="text-muted-foreground mb-2">Connect the tools you already use</p>
         <p className="text-sm text-primary font-medium mb-12">Powered by Composio</p>

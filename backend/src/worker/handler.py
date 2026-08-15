@@ -12,11 +12,33 @@ from aws_lambda_powertools.utilities.batch import (
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-from agent.service import get_agent_service
 from observability import logger, metrics
 from .publisher import publish_completion
 
 processor = BatchProcessor(event_type=EventType.SQS)
+
+
+def _agent_service():
+    """Import the agent lazily, on first use.
+
+    `agent.service` pulls in LangChain, LangGraph and Composio, which together
+    take longer to import than Lambda allows. Init is capped at 10 seconds no
+    matter what the function timeout is, and when it is exceeded Lambda discards
+    that initialization and runs it again inside the first invocation — so the
+    whole import is paid for twice, once for nothing:
+
+        {"phase":"init","status":"timeout","durationMs":9999.088}
+
+    Importing here moves that work into the invoke phase, where no such ceiling
+    applies. The import still costs what it costs; it simply stops being
+    charged twice and stops burning ten seconds against a limit first.
+
+    Python caches modules after the first import, so warm invocations on the
+    same container pay nothing here.
+    """
+    from agent.service import get_agent_service
+
+    return get_agent_service()
 
 
 def _handle_record(record: dict[str, Any]) -> None:
@@ -35,7 +57,7 @@ def _handle_record(record: dict[str, Any]) -> None:
     logger.info("Task started", message_length=len(message))
     try:
         result = asyncio.run(
-            get_agent_service().execute_task(
+            _agent_service().execute_task(
                 user_message=message,
                 user_id=user_id,
                 conversation_id=session_id,

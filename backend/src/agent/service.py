@@ -54,8 +54,8 @@ logger = get_logger(__name__)
 # verbatim. Summarising rather than discarding means a follow-up like "send
 # that to the team" still resolves — a hard reset would lose what "that" was.
 # It happens silently; the user is never told.
-MAX_HISTORY_TOKENS = 24_000
-KEEP_RECENT_MESSAGES = 20
+MAX_HISTORY_TOKENS = 16_000
+KEEP_RECENT_TOKENS = 6_000
 
 # A run is not capped by call count.
 #
@@ -127,7 +127,13 @@ class ExecutionAgent:
                     SummarizationMiddleware(
                         model=self.llm,
                         trigger=("tokens", MAX_HISTORY_TOKENS),
-                        keep=("messages", KEEP_RECENT_MESSAGES),
+                        # Keep by size, not by count. `keep` defaults to
+                        # ("messages", 20), which is unbounded here: one tool
+                        # message can hold an entire API response, so twenty of
+                        # them is however many tokens the tools happened to
+                        # return. Replayed history grew every turn as a result,
+                        # from 27k tokens to 267k across one conversation.
+                        keep=("tokens", KEEP_RECENT_TOKENS),
                         token_counter=count_tokens_approximately,
                     ),
                 ],

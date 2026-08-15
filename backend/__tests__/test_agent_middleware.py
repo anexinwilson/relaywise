@@ -1,3 +1,4 @@
+import io
 """Guard the agent's middleware configuration.
 
 `SummarizationMiddleware` validates its arguments in `__init__`, which happens
@@ -11,7 +12,7 @@ import pytest
 from langchain.agents.middleware import SummarizationMiddleware
 from langchain_core.messages.utils import count_tokens_approximately
 
-from agent.service import KEEP_RECENT_MESSAGES, MAX_HISTORY_TOKENS
+from agent.service import KEEP_RECENT_TOKENS, MAX_HISTORY_TOKENS
 
 
 class FakeModel:
@@ -28,7 +29,7 @@ def test_summarization_config_is_valid() -> None:
     middleware = SummarizationMiddleware(
         model=FakeModel(),
         trigger=("tokens", MAX_HISTORY_TOKENS),
-        keep=("messages", KEEP_RECENT_MESSAGES),
+        keep=("tokens", KEEP_RECENT_TOKENS),
         token_counter=count_tokens_approximately,
     )
 
@@ -41,7 +42,7 @@ def test_mapping_config_is_rejected() -> None:
         SummarizationMiddleware(
             model=FakeModel(),
             trigger={"tokens": MAX_HISTORY_TOKENS},
-            keep={"messages": KEEP_RECENT_MESSAGES},
+            keep={"tokens": KEEP_RECENT_TOKENS},
             token_counter=count_tokens_approximately,
         )
 
@@ -49,4 +50,26 @@ def test_mapping_config_is_rejected() -> None:
 def test_history_budget_leaves_room_for_a_reply() -> None:
     """Trigger must sit well inside the model's window, not at its edge."""
     assert 0 < MAX_HISTORY_TOKENS <= 32_000
-    assert KEEP_RECENT_MESSAGES > 0
+    assert KEEP_RECENT_TOKENS > 0
+
+
+def test_kept_history_is_measured_in_tokens() -> None:
+    """`keep` must be a token budget, not a message count.
+
+    The default is ("messages", 20). A single tool message can carry an entire
+    API response, so twenty of them is an unbounded number of tokens: replayed
+    history grew from 27k to 267k tokens across one conversation before this
+    was changed.
+    """
+    from agent import service
+
+    source = (service.__file__ or "").replace(".pyc", ".py")
+    text = io.open(source, encoding="utf-8").read() if source else ""
+
+    assert 'keep=("tokens"' in text
+    assert 'keep=("messages"' not in text
+
+
+def test_kept_history_is_smaller_than_the_trigger() -> None:
+    """Summarising must actually shrink the thread."""
+    assert KEEP_RECENT_TOKENS < MAX_HISTORY_TOKENS

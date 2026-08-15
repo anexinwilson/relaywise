@@ -5,9 +5,9 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Relaywise - Chat With Your Apps. Automate Anything.",
+  title: "Relaywise - Chat With Your Apps",
   description:
-    "MCP-powered. 500+ integrations. Ask anything, do anything. Automate it all — in plain English.",
+    "An AI agent that operates your connected apps. Ask a question or get something done across 860+ apps, in plain English.",
 };
 
 export default function RootLayout({

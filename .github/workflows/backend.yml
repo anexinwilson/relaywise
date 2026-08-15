@@ -1,0 +1,36 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", "api/**", ".github/workflows/backend.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["backend/**", "api/**", ".github/workflows/backend.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: agent worker
+        working-directory: backend
+        run: uv run --frozen pytest
+
+      - name: api
+        working-directory: api
+        run: uv run --frozen pytest

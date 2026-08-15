@@ -11,52 +11,51 @@ const faqItems = [
   {
     question: "What is Relaywise?",
     answer:
-      "Relaywise is where you talk to your apps instead of clicking through them. Connect your tools, Slack, Notion, Gmail, Discord, HubSpot, whatever you use, and just tell Relaywise what you want. It pulls data, takes action, and runs automations. All in plain English, no setup screens, no learning curve.",
+      "Relaywise lets you operate your apps by asking. Connect Slack, Notion, Gmail, Discord or whatever else you use, then describe what you want in plain English. It works out which tools to call, calls them, and reports back.",
   },
   {
     question: "What can I actually do with it?",
-    answer: `Chat with your apps. Ask "what customer complaints came in today?" and Relaywise pulls answers from Slack, Discord, Intercom, wherever, all at once. No switching tabs, no copy pasting.
+    answer: `Ask questions across your apps. "What was my last message in Slack?" or "find the file Sarah sent me" and it goes and looks, without you switching tabs.
 
-Instant actions. "Save these to Notion sorted by urgency" or "send this to the support channel." Done immediately, no workflow to build first.
+Take actions. "Send this to the support channel" or "create a page in Notion with these notes." It confirms first, then does it.
 
-Set up automations. Describe it once: "When someone mentions our product in Discord, check if they are a decision maker and notify me." Relaywise figures out the rest and runs it 24/7.
+Work across several apps in one request. Read from one, write to another, in a single conversation.
 
-Multi step workflows. Monitor something, process it, route it, notify someone. Chain it all together from one conversation.
-
-Confirmation before critical actions. For anything important, Relaywise asks before it executes. It does not just run things blindly.`,
+It remembers. Conversations continue where you left them, and things you tell it about yourself carry into later sessions.`,
   },
   {
-    question: "How many apps does Relaywise connect to?",
+    question: "How many apps does it connect to?",
     answer:
-      "862 apps in Relaywise, powered by Composio Managed MCP. If your team uses it, it is probably already there.",
+      "Around 860, through Composio's Tool Router. Tools are discovered when you ask for something rather than configured in advance, so anything Composio supports is reachable without setup on your side.",
   },
   {
     question: "How is this different from Zapier, Make, or n8n?",
-    answer: `All three make you think like an engineer before you get anything done. Zapier has you clicking through 20 screens. Make has visual nodes that look like a circuit board. n8n is practically a coding tool. All of them dump the cognitive load on you.
+    answer: `Those are workflow builders. You define triggers, map fields and wire steps together in advance, and the workflow then runs on its own.
 
-Relaywise flips that. You describe what you want in plain English and it handles the wiring. No triggers to configure, no fields to map, no logic trees to untangle. Less time figuring out the tool, more time actually getting work done.
+Relaywise is the opposite shape. There is nothing to build first. You ask for something and it works out the steps at that moment. That makes it good for one-off requests and questions spanning several apps, which a workflow builder is clumsy at.
 
-The other thing none of them can do: ask a live question across multiple apps and get an instant answer. That is a completely different kind of useful.`,
+The tradeoff is real: Relaywise does not run anything on a schedule or in the background. If you need something to fire automatically at 9am every day, a workflow tool is the right choice.`,
   },
   {
     question: "Does it ask before doing things?",
     answer:
-      "Yes. For anything important or hard to undo, Relaywise checks with you first rather than running it blindly. Your app passwords and tokens are never stored here, connected-app credentials stay with Composio.",
+      "It reads without asking, and confirms before writing, sending or deleting. Your app passwords and tokens are never stored by Relaywise. Connected-app credentials stay with Composio.",
   },
   {
     question: "Who is this for?",
     answer:
-      'Anyone who has too many apps open and too little time. The person managing a side project who does not want to learn Zapier just to save some time. The freelancer juggling clients across five tools. The creator trying to keep up with their community. The hobbyist who just wants their stuff to talk to each other without writing a single line of code. If you have ever thought "there has to be a faster way to do this," this is it.',
+      "People with more apps open than time. If you keep hunting through Slack, email and notes for one thing, or want something done in another app without leaving what you are doing, this shortens that.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "For a one time action: seconds. For an automation running permanently: under a minute. You describe it, Relaywise asks a clarifying question or two, and it is live.",
+      "Connecting an app is an OAuth flow, so seconds each. After that you just ask. There is nothing to configure, no triggers or field mapping.",
   },
   {
     question: "What does it cost?",
-    answer:
-      "Nothing. You get 100 credits a month, and they reset at the start of each month. There is no paid plan and no card to enter.\n\nThe allowance exists so one person cannot run up the model bill for everyone else. A typical request costs a fraction of a credit, so you are unlikely to notice it.",
+    answer: `Nothing, and there is no paid plan or card to enter. Every account gets 100 credits a month, which reset at the start of each month.
+
+Credits are metered from actual model usage, so a short question costs little and a long conversation touching several apps costs more. The allowance exists so one person cannot run up the model bill for everyone.`,
   },
 ];
 

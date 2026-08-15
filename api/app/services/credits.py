@@ -17,7 +17,12 @@ from app.clients import get_redis
 from app.core.telemetry import logger
 
 STARTING_CREDITS = 100.0
-KEY_TTL_SECONDS = 45 * 24 * 60 * 60
+# 31 days, the length of the longest month. The floor is a key created in the
+# first moment of a 31 day month: expiry then lands exactly on the next
+# period's boundary, so a live balance is never wiped mid-month. The reset
+# itself comes from the month in the key name, not from this value.
+# Mirrored in backend/src/credits/period.py; change both together.
+KEY_TTL_SECONDS = 31 * 24 * 60 * 60
 
 
 def current_period(now: datetime | None = None) -> str:

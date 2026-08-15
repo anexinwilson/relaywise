@@ -25,25 +25,25 @@ export function CreditsDisplay({ refreshTrigger }: CreditsDisplayProps) {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchCredits = async () => {
       try {
-        setCredits((prev) => ({ ...prev, loading: true }));
-        const response = await fetch("/api/credits/balance");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch credits");
-        }
+        const response = await fetch("/api/credits/balance", { cache: "no-store" });
+        if (!response.ok) throw new Error("Failed to fetch credits");
 
         const data = await response.json();
+        if (cancelled) return;
         setCredits({
-          remainingCredits: data.remaining_credits || 0,
-          totalCredits: data.total_credits || 100,
-          usedCredits: data.used_credits || 0,
+          remainingCredits: data.remaining_credits ?? 0,
+          totalCredits: data.total_credits ?? 100,
+          usedCredits: data.used_credits ?? 0,
           loading: false,
           error: null,
         });
       } catch (err) {
         console.error("Error fetching credits:", err);
+        if (cancelled) return;
         setCredits((prev) => ({
           ...prev,
           loading: false,
@@ -53,6 +53,20 @@ export function CreditsDisplay({ refreshTrigger }: CreditsDisplayProps) {
     };
 
     fetchCredits();
+
+    // Redis is the source of truth and can change without this tab doing
+    // anything: another tab, a second device, or the monthly reset. Refetching
+    // only after a task completes leaves the figure stale for as long as the
+    // page sits open.
+    const onFocus = () => fetchCredits();
+    window.addEventListener("focus", onFocus);
+    const poll = window.setInterval(fetchCredits, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(poll);
+    };
   }, [refreshTrigger]);
 
   if (credits.loading) {

@@ -50,7 +50,7 @@ export default function HeroSection() {
           className="text-5xl md:text-6xl font-bold mb-6"
         >
           Chat With Your Apps.{" "}
-          <span className="text-gradient-primary">Automate Anything.</span>
+          <span className="text-gradient-primary">Get Things Done.</span>
         </motion.h1>
 
         <motion.p
@@ -59,8 +59,8 @@ export default function HeroSection() {
           transition={{ delay: 0.1 }}
           className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
         >
-          862 apps. Powered by Composio. Ask anything, do anything. Automate it all — in
-          plain English.
+          Ask a question or get something done across 860+ apps, in plain English. Powered
+          by Composio.
         </motion.p>
 
         <motion.div

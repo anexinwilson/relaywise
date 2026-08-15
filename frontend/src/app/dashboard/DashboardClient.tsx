@@ -61,6 +61,8 @@ export function DashboardClient({ user }: DashboardClientProps) {
     () => false,
   );
   const isFirstLoad = useRef(true);
+  // Whether the landing conversation has already been opened for this mount.
+  const autoOpenedRef = useRef(false);
   // Track IDs we've just deleted so they don't re-appear via loadConversations
   const recentlyDeletedIds = useRef<Set<string>>(new Set());
 
@@ -231,7 +233,18 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
       setConversations(conversationTasks);
 
-      if (conversationTasks.length > 0 && currentTaskId === null) {
+      // Open the most recent conversation on arrival, once.
+      //
+      // Without the ref this re-fires whenever currentTaskId becomes null,
+      // which is exactly what "New Task" does: the click cleared the
+      // selection, this effect saw null and reopened the first conversation,
+      // so the button appeared dead.
+      if (
+        autoOpenedRef.current === false &&
+        conversationTasks.length > 0 &&
+        currentTaskId === null
+      ) {
+        autoOpenedRef.current = true;
         handleTaskClick(conversationTasks[0].id);
       }
 
@@ -261,6 +274,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
   useEffect(() => {
     if (!currentTaskId) return;
 
+    console.log("[AgentEvents] Subscribing with taskId:", currentTaskId);
     const eventSubscription = apolloClient
       .subscribe<{ onAgentEvent: AgentEvent }>({
         query: ON_AGENT_EVENT,
@@ -269,6 +283,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
       .subscribe({
         next: ({ data }) => {
           if (data?.onAgentEvent) {
+            console.log("[AgentEvents] Received:", data.onAgentEvent);
             setThinkingLogs((prev) => [...prev, data.onAgentEvent]);
             // Scroll to bottom when thinking logs update
             setTimeout(() => {

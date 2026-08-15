@@ -184,11 +184,24 @@ resource "aws_lambda_function" "agent_worker" {
   role          = aws_iam_role.worker.arn
   timeout       = local.worker_timeout_seconds
 
-  # Lambda caps the init phase at 10s regardless of function timeout, and
-  # importing LangGraph + Composio exceeded it at 1024 MB. Memory buys CPU
-  # here: the task only peaks at ~291 MB. Roughly cost-neutral, since billing
-  # is GB-ms and the extra CPU removes a full duplicate init per cold start.
-  memory_size = 2048
+  # 1024 MB against a measured peak of ~305 MB, so headroom is roughly 3x.
+  #
+  # This was 2048 for one reason: Lambda caps init at 10s whatever the function
+  # timeout is, importing LangGraph and Composio at module scope exceeded it,
+  # and memory buys CPU. That is no longer how the worker starts. The imports
+  # are lazy now (see worker/handler.py), so they run in the invoke phase where
+  # no ceiling applies and a slower import costs seconds instead of a timeout.
+  #
+  # Dropping back is a real saving rather than a wash. Billing is GB-ms, and a
+  # healthy run spends 4 to 12 seconds mostly waiting on Bedrock, Composio and
+  # Postgres. Waiting does not get faster with more CPU, so the second gigabyte
+  # was being charged for idle time.
+  #
+  # Ignore the 40 to 52 second runs in the old logs when sizing this. Those
+  # were a run thrashing against a since-removed model call ceiling, and a cold
+  # start where init timed out and Lambda repeated the whole initialization.
+  # Neither is what the work actually costs.
+  memory_size = 1024
 
   image_uri    = var.worker_image_uri
   package_type = "Image"

@@ -17,9 +17,17 @@ from datetime import datetime, timezone
 
 STARTING_CREDITS = 100.0
 
-# Comfortably longer than any month, so a key never expires while its period is
-# still current.
-KEY_TTL_SECONDS = 45 * 24 * 60 * 60
+# 31 days, the length of the longest month.
+#
+# The floor is set by the worst case: a key created in the first moment of a
+# 31 day month. Expiry lands exactly on the next period's boundary, and a key
+# created any later expires further past it, so a live balance can never be
+# wiped mid-month and hand out a second allowance.
+#
+# Nothing above 31 buys anything. The reset is driven by the month in the key
+# name, not by this value, so a longer TTL only leaves dead keys sitting in
+# Redis after the last moment anybody could read them.
+KEY_TTL_SECONDS = 31 * 24 * 60 * 60
 
 
 def current_period(now: datetime | None = None) -> str:

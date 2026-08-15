@@ -122,3 +122,67 @@ resource "aws_budgets_budget" "bedrock" {
     subscriber_email_addresses = [var.alert_email]
   }
 }
+
+# Keeping the free-tier data stores awake.
+#
+# Neon and Upstash reclaim idle resources, and a portfolio project is idle by
+# nature: the person most likely to open it is a stranger doing so months after
+# it was last touched. A suspended database greets them with a connection
+# error, which is worse than no demo at all.
+#
+# Every three days is well inside any provider's inactivity window while adding
+# roughly ten invocations a month, which is free. The target is the existing
+# API function, so this costs no extra image, no extra IAM role and nothing to
+# keep patched.
+resource "aws_cloudwatch_event_rule" "keepalive" {
+  count = var.deployment_phase == "complete" ? 1 : 0
+
+  name                = "relaywise-keepalive"
+  description         = "Reads from Postgres and Redis so neither is reclaimed for inactivity."
+  schedule_expression = "rate(3 days)"
+}
+
+resource "aws_cloudwatch_event_target" "keepalive" {
+  count = var.deployment_phase == "complete" ? 1 : 0
+
+  rule = aws_cloudwatch_event_rule.keepalive[0].name
+  arn  = aws_lambda_function.api[0].arn
+
+  # detail-type is what handler.py matches on to tell this apart from an
+  # AppSync resolver payload or an HTTP proxy event.
+  input = jsonencode({ "detail-type" = "relaywise.keepalive" })
+}
+
+resource "aws_lambda_permission" "keepalive" {
+  count = var.deployment_phase == "complete" ? 1 : 0
+
+  statement_id  = "AllowKeepaliveInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api[0].function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.keepalive[0].arn
+}
+
+# A store unreachable for two consecutive runs means roughly six days of
+# failure, which is long enough to be a real outage and not a blip.
+resource "aws_cloudwatch_metric_alarm" "keepalive_failing" {
+  count = var.deployment_phase == "complete" ? 1 : 0
+
+  alarm_name        = "relaywise-keepalive-failing"
+  alarm_description = "Postgres or Redis has been unreachable across repeated keepalive runs."
+
+  namespace   = "Relaywise"
+  metric_name = "KeepaliveFailed"
+  dimensions  = { service = "api" }
+
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+}

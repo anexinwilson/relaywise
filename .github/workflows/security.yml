@@ -1,0 +1,66 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: npm install --global snyk
+
+      # Snyk needs the dependency tree on disk, not just a lockfile.
+      - name: install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Static analysis of the application source. Requires Snyk Code to be
+      # enabled for the organisation; without it the CLI returns 403.
+      - name: sast
+        run: snyk code test --severity-threshold=high
+
+      # Terraform misconfiguration: over-permissive IAM, unencrypted
+      # resources, public access. Neither Dependabot nor CodeQL reads this.
+      - name: iac
+        run: snyk iac test terraform/ --severity-threshold=high
+
+      - name: npm dependencies
+        run: snyk test --file=frontend/package-lock.json --severity-threshold=high
+
+      # Python uses pip-audit, not Snyk. Snyk's pip resolver silently covered
+      # 31 of 74 packages, skipping langchain, langgraph, openai, composio and
+      # boto3, and reported a cryptography version present in neither the
+      # lockfile nor the installed environment.
+      - name: python dependencies
+        run: |
+          for project in backend api; do
+            (cd "$project" && uv export --frozen --no-dev --no-emit-project --no-hashes > requirements.txt)
+            uvx pip-audit -r "$project/requirements.txt"
+          done
+        shell: bash
