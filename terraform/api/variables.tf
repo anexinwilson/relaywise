@@ -87,6 +87,11 @@ variable "bedrock_monthly_budget_usd" {
 
 variable "cors_allowed_origins" {
   type        = string
-  description = "Comma-separated origins allowed to call the HTTP surface."
-  default     = "http://localhost:3000"
+  description = <<-EOT
+    Comma-separated origins allowed to call the HTTP surface.
+
+    Both the deployed frontend and local development are listed, so neither
+    needs changing when the other is worked on.
+  EOT
+  default     = "http://localhost:3000,https://relaywise-ebon.vercel.app"
 }
