@@ -92,7 +92,7 @@ export default function OnboardingPage() {
                 <button
                   key={i}
                   onClick={() => handlePickTemplate(template.name)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-background hover:bg-muted transition-colors text-left"
+                  className="w-full flex cursor-pointer items-center gap-3 p-3 rounded-lg bg-background hover:bg-muted transition-colors text-left"
                   data-testid={`template-${i}`}
                 >
                   <span className="text-xl">{template.icon}</span>
@@ -128,7 +128,7 @@ export default function OnboardingPage() {
               {popularApps.map((app) => (
                 <button
                   key={app.id}
-                  className="aspect-square rounded-lg bg-background hover:bg-muted transition-colors flex items-center justify-center p-2 group"
+                  className="aspect-square cursor-pointer rounded-lg bg-background hover:bg-muted transition-colors flex items-center justify-center p-2 group"
                   onClick={handleBrowseApps}
                 >
                   <Image

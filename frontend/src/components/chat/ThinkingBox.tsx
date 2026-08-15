@@ -28,7 +28,7 @@ export function ThinkingBox({ logs, isComplete }: ThinkingBoxProps) {
     <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/60 backdrop-blur-sm p-4 text-sm w-full max-w-2xl shadow-sm transition-all">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex justify-between items-center text-muted-foreground hover:text-foreground transition-colors font-medium w-full text-left"
+        className="flex cursor-pointer justify-between items-center text-muted-foreground hover:text-foreground transition-colors font-medium w-full text-left"
       >
         <div className="flex items-center gap-2">
           {isExpanded ? (

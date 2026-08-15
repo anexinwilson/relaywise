@@ -75,7 +75,7 @@ export function TaskList({
       {/* Header */}
       <div className="p-3 pt-4">
         <Button
-          className="w-full cursor-pointer gap-2 bg-foreground text-background hover:bg-foreground/90"
+          className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90"
           onClick={onNewTask}
         >
           <Plus className="w-4 h-4" />
